@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 测试报告 / 缓存
+.pytest_cache/
+reports/allure-results/
+reports/allure-report/
+reports/html/
+*.log
+logs/
+
+# 截图 / trace
+screenshots/
+traces/
+
+# 敏感信息
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store

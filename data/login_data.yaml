@@ -1,0 +1,37 @@
+# 登录接口数据驱动 - 一套用例逻辑跑多组数据
+# 覆盖：正向 / 异常 / 边界
+
+- case_id: login_001
+  desc: 正确账号密码登录成功
+  username: "valid_user"
+  password: "correct_pwd"
+  expected_status: 200
+  expect_success: true
+
+- case_id: login_002
+  desc: 密码错误登录失败
+  username: "valid_user"
+  password: "wrong_pwd"
+  expected_status: 401
+  expect_success: false
+
+- case_id: login_003
+  desc: 用户名为空
+  username: ""
+  password: "correct_pwd"
+  expected_status: 400
+  expect_success: false
+
+- case_id: login_004
+  desc: 密码为空
+  username: "valid_user"
+  password: ""
+  expected_status: 400
+  expect_success: false
+
+- case_id: login_005
+  desc: 账号不存在
+  username: "not_exist_user"
+  password: "any_pwd"
+  expected_status: 401
+  expect_success: false

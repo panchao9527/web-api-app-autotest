@@ -1,0 +1,64 @@
+# =====================================================================
+# 多环境配置文件
+# 通过环境变量 ENV (dev/test/prod) 切换，默认 test
+# 敏感信息(账号密码/token)放 .env，不要写在这里
+# =====================================================================
+
+# 公共配置（所有环境共享）
+common:
+  timeout: 30                # 默认超时(秒)
+  retry: 1                   # 失败重试次数
+  log_level: INFO
+
+# 各环境配置
+dev:
+  api_base_url: "https://dev-api.example.com"
+  web_base_url: "https://dev.example.com"
+  db:
+    host: "dev-db.example.com"
+    port: 3306
+    name: "app_db"
+
+test:
+  api_base_url: "https://test-api.example.com"
+  web_base_url: "https://test.example.com"
+  db:
+    host: "test-db.example.com"
+    port: 3306
+    name: "app_db"
+
+prod:
+  api_base_url: "https://api.example.com"
+  web_base_url: "https://www.example.com"
+  db:
+    host: "prod-db.example.com"
+    port: 3306
+    name: "app_db"
+
+# Web (Playwright) 配置
+web:
+  browser: "chromium"        # chromium / firefox / webkit
+  headless: true             # CI 上为 true，本地调试可设 false
+  slow_mo: 0                 # 操作放慢(毫秒)，调试用
+  viewport:
+    width: 1920
+    height: 1080
+  trace: true                # 失败时保留 trace 便于回放
+
+# App (Appium) 配置
+app:
+  appium_server: "http://127.0.0.1:4723"
+  platform: "Android"        # Android / iOS
+  android:
+    platformName: "Android"
+    automationName: "UiAutomator2"
+    deviceName: "emulator-5554"
+    appPackage: "com.example.app"
+    appActivity: ".MainActivity"
+    noReset: true
+  ios:
+    platformName: "iOS"
+    automationName: "XCUITest"
+    deviceName: "iPhone 15"
+    platformVersion: "17.0"
+    bundleId: "com.example.app"

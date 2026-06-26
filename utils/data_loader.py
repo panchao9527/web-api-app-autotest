@@ -1,0 +1,36 @@
+"""
+测试数据加载工具 (数据驱动)
+- 支持 yaml / json / excel
+- 用例通过 load_yaml("login_data.yaml") 拿到参数列表，配合 @pytest.mark.parametrize
+"""
+import json
+from pathlib import Path
+
+import yaml
+from openpyxl import load_workbook
+
+from config.settings import settings
+
+DATA_DIR = settings.root_dir / "data"
+
+
+def load_yaml(filename: str) -> list | dict:
+    path = DATA_DIR / filename
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def load_json(filename: str) -> list | dict:
+    path = DATA_DIR / filename
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_excel(filename: str, sheet: str = None) -> list[dict]:
+    """读取 excel，首行作为表头，返回 [{列名: 值}, ...]"""
+    path = DATA_DIR / filename
+    wb = load_workbook(path, data_only=True)
+    ws = wb[sheet] if sheet else wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    headers = rows[0]
+    return [dict(zip(headers, row)) for row in rows[1:]]

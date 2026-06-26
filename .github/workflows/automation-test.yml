@@ -1,0 +1,104 @@
+name: Automation Tests
+
+# 触发：push/PR 到 main，以及每天定时回归
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 2 * * *"   # 每天 02:00 UTC 跑全量回归
+  workflow_dispatch:       # 支持手动触发
+
+jobs:
+  # ---------------- 接口测试 ----------------
+  api-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 运行接口测试
+        env:
+          ENV: test
+          TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+        run: pytest -m api --alluredir=./reports/allure-results
+
+      - name: 上传 Allure 结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-api
+          path: reports/allure-results
+
+  # ---------------- Web UI 测试 ----------------
+  web-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 安装 Playwright 浏览器
+        run: playwright install --with-deps chromium
+
+      - name: 运行 Web 测试
+        env:
+          ENV: test
+          TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+        run: pytest -m web --alluredir=./reports/allure-results
+
+      - name: 上传 Allure 结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-web
+          path: reports/allure-results
+
+  # ---------------- 生成并发布 Allure 报告 ----------------
+  report:
+    needs: [api-test, web-test]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 下载所有 Allure 结果
+        uses: actions/download-artifact@v4
+        with:
+          path: all-results
+
+      - name: 合并结果
+        run: |
+          mkdir -p reports/allure-results
+          find all-results -type f -exec cp {} reports/allure-results/ \;
+
+      - name: 生成 Allure 报告
+        uses: simple-elf/allure-report-action@v1.7
+        with:
+          allure_results: reports/allure-results
+          allure_report: allure-report
+
+      - name: 发布到 GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: allure-report
