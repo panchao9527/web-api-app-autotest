@@ -154,6 +154,15 @@ make report        # 本地生成并打开 Allure 报告
 
 > ⚠️ AI 生成的代码必须 review，框架原理要自己懂，否则会产出难维护的用例。
 
+### 🛠️ Skill：录制裸代码 → 一键重构成 PO
+
+仓库内置了一个 Kiro Skill：**`.kiro/skills/recording-to-po/`**。
+
+用法：在 Kiro 里把 codegen / Appium Inspector 录制的**裸代码**贴给 AI，说一句
+> "用 recording-to-po 这个 skill 重构成 PO"
+
+AI 会按固定工作流：自动判断 Web/App → 生成 `pages/` 或 `screens/` 页面对象 + `testcases/` 用例 → 校验语法 → 提交推送。详见该 skill 的 `SKILL.md`。
+
 ---
 
 ## 🔧 后期维护建议
