@@ -121,6 +121,11 @@ make report        # 本地生成并打开 Allure 报告
 
 ## 🧩 如何新增用例
 
+> 📘 **小白手把手教程**（强烈推荐先看）：
+> - 接口测试：**[docs/api-guide.md](docs/api-guide.md)**
+> - Web 测试：**[docs/web-guide.md](docs/web-guide.md)**
+> - App 测试：**[docs/appium-setup.md](docs/appium-setup.md)**
+
 ### 新增接口测试
 1. 在 `api/` 下封装接口调用(继承 `BaseApi`)
 2. 在 `data/` 下准备数据(可选，数据驱动)
