@@ -65,9 +65,17 @@
 pip install -r requirements.txt
 playwright install chromium        # Web 测试需要
 # App 测试另需: 安装 Appium server + Android SDK / Xcode
+#   详细步骤见 docs/appium-setup.md
 ```
 
 > 也可直接 `make install`
+>
+> 💡 建议用虚拟环境隔离依赖，避免与本机其它包(如 httprunner)冲突：
+> ```bash
+> python -m venv .venv
+> source .venv/Scripts/activate    # Git Bash;  PowerShell 用 .venv\Scripts\activate
+> pip install -r requirements.txt
+> ```
 
 ### 2. 配置环境
 
@@ -125,6 +133,8 @@ make report        # 本地生成并打开 Allure 报告
 ### 新增 App 测试
 1. 在 `screens/` 下新建页面对象(继承 `BaseScreen`)
 2. 在 `testcases/app/` 下写用例，用 `app_driver` fixture
+
+> 📱 **App 自动化首次上手**：完整的 Appium 环境搭建、获取包名/Activity、用 Appium Inspector 抓元素定位、写 Screen 对象与用例的详细步骤，见 **[docs/appium-setup.md](docs/appium-setup.md)**。
 
 > **定位原则**：Web 优先 `data-testid`，App 优先 `resource-id`/`accessibility-id`，避免脆弱的绝对 xpath。
 
