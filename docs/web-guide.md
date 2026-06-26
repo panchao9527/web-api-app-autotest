@@ -121,7 +121,10 @@ class LoginPage(BasePage):
 ```bash
 playwright codegen https://你的网站.com
 ```
-会打开浏览器，**你手点操作，它自动生成对应代码和选择器**！把生成的选择器和操作整理进页面对象即可。
+打开浏览器后**你手点操作，它自动生成对应代码和选择器**——详细用法见 **[第 5 节](#5-用-codegen-录制生成用例详细)**。
+
+### 方法 C：让 AI 操作页面生成（Playwright MCP）
+见 **[第 6 节](#6-用-playwright-mcp-让-ai-生成用例)**。
 
 **选择器稳定性优先级：**
 ```
@@ -130,7 +133,130 @@ data-testid / id  >  role/text  >  css class  >  xpath(尽量避免)
 
 ---
 
-## 5. 动手写你的第一个 Web 用例
+## 5. 用 codegen 录制生成用例（详细）
+
+`playwright codegen` 是 Playwright 自带的**录制器**：你在浏览器里点点点，它实时把操作转成代码。小白产出用例最快的方式。
+
+### 5.1 基本用法
+
+```bash
+playwright codegen --target python https://你的网站.com
+```
+
+回车后弹出**两个窗口**：
+- **左边**：真实浏览器（已打开你的网址）
+- **右边**：Inspector 窗口，**实时显示生成的 Python 代码**
+
+你在左边正常操作（输入、点击、勾选…），右边代码一行行自动冒出来。操作完复制走即可。
+
+> 加 `--target python` 是为了**生成 Python 代码**（默认可能是其它语言）。
+
+生成的代码会优先用稳定定位：
+
+```python
+page.goto("https://你的网站.com/login")
+page.get_by_test_id("username").fill("abc")
+page.get_by_role("button", name="登录").click()
+```
+
+### 5.2 常用参数
+
+| 命令 | 作用 |
+|------|------|
+| `playwright codegen --target python 网址` | 生成 Python 代码 |
+| `playwright codegen -o test.py 网址` | 直接把代码存到 `test.py` |
+| `playwright codegen --save-storage=auth.json 网址` | **录制时保存登录态**(Cookie 等) |
+| `playwright codegen --load-storage=auth.json 网址` | 加载已保存的登录态(免重复登录) |
+| `playwright codegen --device="iPhone 13" 网址` | 模拟手机设备 |
+| `playwright codegen --viewport-size=1920,1080 网址` | 指定窗口尺寸 |
+
+> **登录态技巧**：先 `--save-storage=auth.json` 录一次登录，之后录制都用 `--load-storage=auth.json`，省去每次重复登录。
+
+### 5.3 Inspector 窗口的实用按钮
+
+- **Record**：开始/暂停录制
+- **Pick locator**：点一下再去页面点任意元素，它会告诉你该元素的**最佳选择器**（只想取某个选择器、不想录全程时超好用）
+- **Copy**：复制生成的代码
+
+### 5.4 关键：把录制结果整理成 PO 模式
+
+codegen 生成的是**裸代码**，直接用难维护，要拆进框架的分层结构：
+
+**录制得到：**
+```python
+page.goto("https://xxx.com/")
+page.get_by_test_id("search-input").fill("手机")
+page.get_by_test_id("search-btn").click()
+```
+
+**① 选择器 + 操作 → 页面对象** `pages/search_page.py`：
+```python
+class SearchPage(BasePage):
+    URL          = "/"
+    INPUT_SEARCH = "[data-testid='search-input']"
+    BTN_SEARCH   = "[data-testid='search-btn']"
+
+    @allure.step("搜索: {keyword}")
+    def search(self, keyword):
+        self.open(self.URL)
+        self.fill(self.INPUT_SEARCH, keyword)
+        self.click(self.BTN_SEARCH)
+```
+
+**② 用例 → `testcases/web/`**（见第 7 节）。
+
+> 这步"裸代码 → PO 模式"的转换，可以**让 AI 帮你做**：把录制结果贴给 AI，让它按本框架的 PO 规范整理成 `pages/` + `testcases/web/`。
+
+---
+
+## 6. 用 Playwright MCP 让 AI 生成用例
+
+如果你希望**让 AI 直接操作页面**、自己探索并生成用例，可以用微软官方的 **Playwright MCP** 服务。
+
+### 6.1 codegen vs Playwright MCP
+
+| 工具 | 谁操作页面 | 产出 |
+|------|-----------|------|
+| `playwright codegen` | **你手动点** | 你的操作转成代码 |
+| **Playwright MCP** | **AI 驱动浏览器** | AI 探索页面后生成用例 |
+
+Playwright MCP 给 AI 提供 `navigate / click / type / snapshot` 等工具，AI 通过页面的可访问性树(accessibility tree)实际操控浏览器，能帮你找稳定选择器、生成操作步骤，并边操作边验证。
+
+### 6.2 在 Kiro 里配置
+
+编辑 `.kiro/settings/mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    }
+  }
+}
+```
+
+> ⚠️ 注意：
+> 1. 浏览器 MCP 需要能启动浏览器的环境，建议在**本地 Kiro** 配置（云端受限沙箱可能跑不了）。
+> 2. 配好后重启 Kiro 加载，AI 即可操作你指定的网址。
+> 3. 包名/用法以 [Playwright MCP 官方仓库](https://github.com/microsoft/playwright-mcp) 为准。
+
+### 6.3 工作流（同样要重构成 PO）
+
+```
+① 用 codegen / Playwright MCP 操作页面 → 拿到选择器和操作步骤
+② 让 AI 重构成 PO 模式:
+   - 选择器 → pages/xxx_page.py
+   - 操作   → 封装成业务方法
+   - 用例   → testcases/web/
+```
+
+无论哪种方式，产出都要**整理成 PO 模式**才能长期维护——这步交给 AI 最省事。
+
+---
+
+## 7. 动手写你的第一个 Web 用例
 
 假设测"搜索功能"：打开首页 → 搜索框输入"手机" → 点搜索 → 断言出现结果。
 
@@ -183,7 +309,7 @@ pytest testcases/web/test_search_web.py
 
 ---
 
-## 6. 运行 & 筛选
+## 8. 运行 & 筛选
 
 ```bash
 pytest -m web                 # 只跑 Web 用例
@@ -194,7 +320,7 @@ pytest -m web --headed        # 显示浏览器窗口跑(临时调试，覆盖 h
 
 ---
 
-## 7. 看报告 & 调试
+## 9. 看报告 & 调试
 
 ### Allure 报告（含失败截图）
 ```bash
@@ -215,7 +341,7 @@ playwright show-trace 轨迹文件路径.zip
 
 ---
 
-## 8. 常见问题
+## 10. 常见问题
 
 | 问题 | 应对 |
 |------|------|
