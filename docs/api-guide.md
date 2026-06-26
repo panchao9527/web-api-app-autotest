@@ -86,6 +86,57 @@ class UserApi(BaseApi):
 > `self.client` 就是框架封装的 `HttpClient`，支持 `get / post / put / delete / patch`，
 > 会自动带上 base_url、超时、日志，并把请求/响应记录到 Allure 报告。
 
+#### 💡 为什么用 HttpClient，而不是直接 `import requests`？
+
+`HttpClient` 的**底层就是 `requests`**——它没有重新造轮子，只是在 `requests.Session()` 外面包了一层，把"每个接口项目都要重复写的样板代码"收口到一处。
+
+看 `core/http_client.py` 的核心：
+
+```python
+class HttpClient:
+    def __init__(self, base_url=None, token=None):
+        self.base_url = (base_url or settings.api_base_url).rstrip("/")
+        self.session = requests.Session()          # ← 底层就是 requests
+        self.session.headers.update({"Content-Type": "application/json"})
+        if token:
+            self.session.headers.update({"Authorization": f"Bearer {token}"})
+
+    def request(self, method, path, **kwargs):
+        url = path if path.startswith("http") else f"{self.base_url}{path}"
+        resp = self.session.request(method, url, **kwargs)   # ← 实际还是 requests 发的
+        return resp
+```
+
+这层封装带来的好处：
+
+| 好处 | 裸用 requests | 用 HttpClient |
+|------|--------------|--------------|
+| base_url 自动拼接 | 每次写全 `https://xxx.com/api/users` | 只写 `/api/users`，换环境改一处 |
+| 统一请求头/超时 | 每个请求手写 `headers=`/`timeout=` | 构造时配一次，全局生效 |
+| 登录态贯穿 | 每个请求手动塞 token | `set_token()` 一次，后续请求自动带上 |
+| 自动日志 | 自己 print | 自动打印 `➡️请求` / `⬅️响应` 到控制台和 `logs/` |
+| 自动进报告 | 报告看不到请求详情 | 入参/返回自动附到 Allure，失败好排查 |
+| 用法更简洁 | `session.request("GET", url, ...)` | `client.get("/path")` |
+
+**直观对比：**
+
+```python
+# 裸用 requests —— 每次都要重复
+import requests
+base = "https://test-api.example.com"
+headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
+resp = requests.get(f"{base}/api/users/2", headers=headers, timeout=30)
+
+# 用 HttpClient —— 重复的都封装了
+client = HttpClient()              # base_url、headers、超时、session 都配好
+resp = client.get("/api/users/2")  # 日志、Allure 自动记录
+```
+
+> 关键点：因为用的是 `requests.Session()`（不是每次 `requests.get`），所以 **Cookie、连接复用、登录后的 token** 会自动在同一个 client 的所有请求间保持——这正是[场景级测试](#5-数据驱动一套用例跑多组数据)能把多个接口串起来的底层原因。
+>
+> 一句话：`HttpClient` = `requests.Session` + base_url 拼接 + 统一配置 + 登录态贯穿 + 自动日志 + 自动报告。和 Web 用 `BasePage`、App 用 `BaseScreen` 是同一个分层思路。
+
+
 ### 3.2 用例：`testcases/api/test_login_api.py`
 
 ```python
