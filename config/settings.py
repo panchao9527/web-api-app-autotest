@@ -38,7 +38,17 @@ class Settings:
         # ---- API ----
         self.api_base_url = self._env_cfg["api_base_url"]
         self.web_base_url = self._env_cfg["web_base_url"]
-        self.db = self._env_cfg.get("db", {})
+
+        # ---- DB (host/port/name 来自 config.yaml; user/password 来自 .env) ----
+        db_cfg = dict(self._env_cfg.get("db", {}))
+        db_cfg["user"] = os.getenv("DB_USER", db_cfg.get("user", ""))
+        db_cfg["password"] = os.getenv("DB_PASSWORD", db_cfg.get("password", ""))
+        self.db = db_cfg
+
+        # ---- Redis (host/port/db 来自 config.yaml; password 来自 .env) ----
+        redis_cfg = dict(self._env_cfg.get("redis", {}))
+        redis_cfg["password"] = os.getenv("REDIS_PASSWORD", redis_cfg.get("password", ""))
+        self.redis = redis_cfg
 
         # ---- 公共 ----
         self.timeout = self.common.get("timeout", 30)
@@ -53,6 +63,12 @@ class Settings:
         self.username = os.getenv("TEST_USERNAME", "")
         self.password = os.getenv("TEST_PASSWORD", "")
         self.api_token = os.getenv("API_TOKEN", "")
+
+        # ---- 通知 (webhook 含密钥，来自 .env) ----
+        self.notify = {
+            "dingtalk_webhook": os.getenv("DINGTALK_WEBHOOK", ""),
+            "wecom_webhook": os.getenv("WECOM_WEBHOOK", ""),
+        }
 
     @property
     def root_dir(self) -> Path:

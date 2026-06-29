@@ -18,6 +18,10 @@ dev:
     host: "dev-db.example.com"
     port: 3306
     name: "app_db"
+  redis:
+    host: "dev-redis.example.com"
+    port: 6379
+    db: 0
 
 test:
   api_base_url: "https://test-api.example.com"
@@ -26,6 +30,10 @@ test:
     host: "test-db.example.com"
     port: 3306
     name: "app_db"
+  redis:
+    host: "test-redis.example.com"
+    port: 6379
+    db: 0
 
 prod:
   api_base_url: "https://api.example.com"
@@ -34,6 +42,10 @@ prod:
     host: "prod-db.example.com"
     port: 3306
     name: "app_db"
+  redis:
+    host: "prod-redis.example.com"
+    port: 6379
+    db: 0
 
 # Web (Playwright) 配置
 web:

@@ -21,7 +21,8 @@ selenium==4.27.1
 
 # ===== 数据 / 配置 =====
 PyYAML==6.0.2
-PyMySQL==1.1.1                 # 数据库校验(可选)
+PyMySQL==1.1.1                 # MySQL 数据校验
+redis==5.2.1                   # Redis 读写/校验
 openpyxl==3.1.5                # excel 数据驱动
 Faker==33.1.0                  # 造测试数据
 python-dotenv==1.0.1           # 敏感信息环境变量

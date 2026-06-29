@@ -38,6 +38,10 @@
 ├── screens/             # App 页面对象(移动端 PO 模式)
 │   ├── base_screen.py
 │   └── login_screen.py
+├── clients/             # 测试基础设施客户端(DB/Redis/通知)
+│   ├── db_client.py     #   MySQL 查库断言/数据准备清理
+│   ├── redis_client.py  #   Redis 缓存校验
+│   └── notify.py        #   钉钉/企微 机器人通知
 ├── testcases/           # 测试用例(只写业务逻辑)
 │   ├── api/
 │   ├── web/
@@ -47,10 +51,12 @@
 ├── fixtures/            # 共享 fixture(登录态复用、数据准备清理)
 │   └── api_fixtures.py
 ├── utils/               # 工具(日志、数据加载、随机数据)
+├── docs/                # 使用文档(api/web/appium/infra-clients 指南)
 ├── reports/             # Allure 报告输出
 ├── conftest.py          # 全局 hook + fixture(失败自动截图)
 ├── pytest.ini           # pytest 配置 + 用例标记
-├── requirements.txt
+├── requirements.txt          # 核心依赖(轻量)
+├── requirements-optional.txt # 可选依赖(ES/Kafka/MQ 等，用到再装)
 ├── Makefile             # 常用命令快捷方式
 └── .github/workflows/   # CI/CD
 ```
@@ -125,6 +131,7 @@ make report        # 本地生成并打开 Allure 报告
 > - 接口测试：**[docs/api-guide.md](docs/api-guide.md)**
 > - Web 测试：**[docs/web-guide.md](docs/web-guide.md)**
 > - App 测试：**[docs/appium-setup.md](docs/appium-setup.md)**
+> - 基础设施客户端(DB/Redis/通知)：**[docs/infra-clients.md](docs/infra-clients.md)**
 
 ### 新增接口测试
 1. 在 `api/` 下封装接口调用(继承 `BaseApi`)
