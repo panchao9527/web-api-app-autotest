@@ -21,8 +21,8 @@ class Settings:
     """全局配置对象，集中管理所有环境/三端配置"""
 
     def __init__(self):
-        # 当前环境，优先取环境变量，默认 test
-        self.env = os.getenv("ENV", "test").lower()
+        # 当前环境，优先取环境变量，默认 uat
+        self.env = os.getenv("ENV", "uat").lower()
 
         # 读取 yaml
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:

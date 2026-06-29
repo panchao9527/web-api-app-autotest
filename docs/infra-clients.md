@@ -25,9 +25,9 @@
 
 `config/config.yaml`（已为每个环境预留）：
 ```yaml
-test:
-  db:    { host: "test-db.example.com",    port: 3306, name: "app_db" }
-  redis: { host: "test-redis.example.com", port: 6379, db: 0 }
+uat:
+  db:    { host: "uat-db.example.com",    port: 3306, name: "app_db" }
+  redis: { host: "uat-redis.example.com", port: 6379, db: 0 }
 ```
 
 `.env`：

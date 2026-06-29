@@ -10,7 +10,7 @@
 - **分层架构**：核心层与业务层解耦，UI/接口改动只改一处
 - **PO 模式**：Web 用 Page Object，App 用 Screen Object，用例只写业务语义
 - **数据驱动**：yaml / json / excel 驱动，一套逻辑跑多组数据
-- **多环境**：dev / test / prod 一键切换，敏感信息走 `.env`
+- **多环境**：sit / uat / prod 一键切换，敏感信息走 `.env`
 - **Allure 报告**：失败自动截图、请求/响应详情自动附加
 - **CI/CD**：GitHub Actions 自动跑 + 每日定时回归 + 报告发布
 - **失败重试**：过滤偶发抖动，提升稳定性
@@ -101,7 +101,7 @@ make smoke         # 只跑冒烟(P0核心链路)
 make parallel      # 4 进程并发加速
 
 # 或直接用 pytest
-ENV=test pytest -m api                    # 指定环境跑接口
+ENV=uat pytest -m api                     # 指定环境跑接口
 pytest -m "smoke and api"                 # 组合标记
 pytest testcases/api/test_login_api.py    # 跑单个文件
 ```

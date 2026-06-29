@@ -45,7 +45,7 @@ playwright install chromium
 ### 2.1 改网址 `config/config.yaml`
 
 ```yaml
-test:
+uat:
   web_base_url: "https://你的网站.com"    # ← 改这里
 ```
 

@@ -98,7 +98,7 @@
 - **非敏感配置**（地址、端口、超时）→ `config/config.yaml`，分环境。
 - **敏感信息**（账号、密码、token、webhook）→ `.env`（不入库），示例放 `.env.example`。
 - 多组数据用**数据驱动**：放 `data/*.yaml`，用 `parametrize` + `load_yaml`。
-- 切环境用 `ENV=dev/test/prod`，不要在代码里写死。
+- 切环境用 `ENV=sit/uat/prod`，不要在代码里写死。
 
 ---
 

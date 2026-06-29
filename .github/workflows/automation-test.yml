@@ -28,7 +28,7 @@ jobs:
 
       - name: 运行接口测试
         env:
-          ENV: test
+          ENV: uat
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
         run: pytest -m api --alluredir=./reports/allure-results
@@ -60,7 +60,7 @@ jobs:
 
       - name: 运行 Web 测试
         env:
-          ENV: test
+          ENV: uat
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
         run: pytest -m web --alluredir=./reports/allure-results

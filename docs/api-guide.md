@@ -53,10 +53,10 @@ pip install -r requirements.txt
 
 ## 2. 配置：告诉框架你的后端地址在哪
 
-打开 `config/config.yaml`，找到 `test` 环境，把 `api_base_url` 改成**你要测的后端地址**：
+打开 `config/config.yaml`，找到 `uat` 环境，把 `api_base_url` 改成**你要测的后端地址**：
 
 ```yaml
-test:
+uat:
   api_base_url: "https://你的后端地址.com"   # ← 改这里
 ```
 
@@ -123,7 +123,7 @@ class HttpClient:
 ```python
 # 裸用 requests —— 每次都要重复
 import requests
-base = "https://test-api.example.com"
+base = "https://uat-api.example.com"
 headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
 resp = requests.get(f"{base}/api/users/2", headers=headers, timeout=30)
 
