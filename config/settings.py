@@ -54,6 +54,9 @@ class Settings:
         self.timeout = self.common.get("timeout", 30)
         self.retry = self.common.get("retry", 1)
         self.log_level = self.common.get("log_level", "INFO")
+        # 是否在日志打印接口返回报文 + 最大长度(超出截断)
+        self.log_response = self.common.get("log_response", True)
+        self.log_response_max = self.common.get("log_response_max", 1000)
 
         # ---- Web / App ----
         self.web = self._raw.get("web", {})

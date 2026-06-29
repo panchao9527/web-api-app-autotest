@@ -44,6 +44,13 @@ class HttpClient:
 
         # 记录响应
         log.info(f"⬅️  {resp.status_code} | 耗时 {resp.elapsed.total_seconds():.2f}s")
+        # 全局开关：是否打印返回报文(config.yaml 的 log_response)
+        if settings.log_response:
+            body = resp.text or ""
+            max_len = settings.log_response_max
+            if len(body) > max_len:
+                body = body[:max_len] + f"...(共{len(resp.text)}字符,已截断)"
+            log.info(f"   响应: {body}")
         self._attach_to_allure(method, url, kwargs, resp)
         return resp
 
