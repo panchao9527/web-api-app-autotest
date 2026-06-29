@@ -26,3 +26,7 @@ traces/
 .vscode/
 *.swp
 .DS_Store
+
+
+# 真实门店数据文件(勿提交到公开仓库)，保留 *.txt.example
+data/sales/*.txt

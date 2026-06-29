@@ -34,3 +34,25 @@ def load_excel(filename: str, sheet: str = None) -> list[dict]:
     rows = list(ws.iter_rows(values_only=True))
     headers = rows[0]
     return [dict(zip(headers, row)) for row in rows[1:]]
+
+
+
+def read_lines(filename: str) -> list[str]:
+    """
+    读取纯文本文件，每行一个值（如门店编码列表）。
+    - 自动去除空白行和以 # 开头的注释行
+    - filename 相对 data/ 目录，如 "sales/m餐厅.txt"
+    - 文件不存在时返回 []（不报错，便于 CI 上缺数据时跳过）
+    """
+    path = DATA_DIR / filename
+    if not path.exists():
+        from utils.logger import log
+        log.warning(f"数据文件不存在，返回空列表: {path}")
+        return []
+    result = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                result.append(line)
+    return result
