@@ -96,3 +96,15 @@ def app_driver():
     driver = create_app_driver()
     yield driver
     driver.quit()
+
+
+
+@pytest.fixture
+def network_recorder(page):
+    """
+    网络录制器：跑 UI 流程时自动捕获接口调用序列。
+    用于"UI 操作 → 抓接口序列 → 反推接口场景用例"。
+    """
+    from core.network_recorder import NetworkRecorder
+
+    return NetworkRecorder(page)
