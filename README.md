@@ -132,6 +132,7 @@ make report        # 本地生成并打开 Allure 报告
 > - Web 测试：**[docs/web-guide.md](docs/web-guide.md)**
 > - App 测试：**[docs/appium-setup.md](docs/appium-setup.md)**
 > - 基础设施客户端(DB/Redis/通知)：**[docs/infra-clients.md](docs/infra-clients.md)**
+> - 团队代码规范：**[docs/coding-standards.md](docs/coding-standards.md)**
 
 ### 新增接口测试
 1. 在 `api/` 下封装接口调用(继承 `BaseApi`)
