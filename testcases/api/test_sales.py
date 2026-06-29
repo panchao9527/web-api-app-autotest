@@ -3,17 +3,16 @@
 - 原来 3 个近 2000 行、只差 ownership(M/L/J) 的方法 → 合并为 1 个数据驱动用例
 - 门店编码从 data/sales/*.txt 读取（真实文件不入库，见 *.txt.example）
 """
-import datetime
-
 import allure
 import pytest
 
 from api.sales_api import SalesApi
 from core.assertions import Assert
 from utils.data_loader import read_lines
+from utils.date_util import yesterday_str
 
 # 业务日期：默认取前一天
-BUSINESS_DATE = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+BUSINESS_DATE = yesterday_str()
 
 # 门店列表文件 → ownership 映射（要加一类餐厅只需在这里加一行）
 STORE_FILE_OWNERSHIP = [
