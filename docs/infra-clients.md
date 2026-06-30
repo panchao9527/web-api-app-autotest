@@ -85,6 +85,57 @@ with RedisClient() as r:
 
 ---
 
+## 1bis. 数据库典型用法：入参查库 + 断言查库 + DB数据驱动
+
+接口测试里很常见：**请求入参要先查库拿合法数据**，**断言时也要查库核对**。框架提供 `db` fixture（用例里直接用，自动关连接）。
+
+### 场景 A：入参依赖查库（先查 DB 拿合法数据，再发请求）
+```python
+def test_create_order(db):
+    # ① 从库里取一个"在售"商品作为入参(避免硬编码不存在的ID)
+    product = db.query_one("SELECT id, price FROM products WHERE status='on' LIMIT 1")
+    assert product, "库里没有在售商品，无法下单"
+
+    # ② 用查到的数据发请求
+    resp = OrderApi().create_order(product_id=product["id"], qty=2)
+    Assert.status_code(resp, 200)
+```
+
+### 场景 B：断言查库（不只信接口返回，查库二次核对）
+```python
+def test_create_order_db_check(db):
+    resp = OrderApi().create_order(product_id=1001, qty=2)
+    order_id = extract(resp.json(), "$.data.order_id")
+
+    # 查库确认订单真的落库、状态/金额对
+    row = db.query_one("SELECT status, amount FROM orders WHERE order_id=%s", [order_id])
+    Assert.not_none(row, "订单应已写入数据库")
+    Assert.equal(row["status"], "CREATED")
+    Assert.approx(row["amount"], 199.00)        # 金额用近似断言
+```
+
+### 场景 C：DB 数据驱动（用查询结果生成参数化用例）
+> 注意：parametrize 在**收集阶段**执行，早于 fixture，所以这里用**模块级函数**直接查库，不能用 `db` fixture。
+
+```python
+from clients.db_client import DBClient
+
+def load_active_stores():
+    """从库里查出所有在营门店，作为用例参数（替代手维护 txt 文件）"""
+    with DBClient() as db:
+        rows = db.query("SELECT store_code FROM stores WHERE status='active'")
+    return [r["store_code"] for r in rows]
+
+@pytest.mark.parametrize("store_code", load_active_stores())
+def test_store(store_code):
+    ...
+```
+> 这样门店列表**实时来自数据库**，不用手动维护 `data/sales/*.txt`。
+
+> ⚠️ 提醒：入参/断言查库用 `SELECT`；如需造数据用 `db.execute(...)`，并记得用例后清理(teardown)。
+
+---
+
 ## 3. 通知：推送测试结果到钉钉/企微
 
 ```python

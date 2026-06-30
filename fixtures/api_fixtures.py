@@ -44,3 +44,21 @@ def created_user(logged_in_client):
     if user_id:
         api.delete_user(user_id)
         log.info(f"清理测试用户: id={user_id}")
+
+
+
+@pytest.fixture
+def db():
+    """
+    数据库 fixture：用例里直接 db.query/query_one/execute，结束自动关连接。
+    用途：①取入参依赖的数据 ②断言时查库核对。
+    用法:
+        def test_xxx(db):
+            row = db.query_one("SELECT id FROM products WHERE status='on' LIMIT 1")
+            ...
+    """
+    from clients.db_client import DBClient
+
+    client = DBClient()
+    yield client
+    client.close()
