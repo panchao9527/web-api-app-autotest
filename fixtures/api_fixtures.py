@@ -62,3 +62,67 @@ def db():
     client = DBClient()
     yield client
     client.close()
+
+
+
+class CleanupRegistry:
+    """
+    清理任务登记器：用例里注册"要清什么"，用例结束后统一执行。
+    支持两种清理方式：①删库 SQL ②任意回调(如调删除接口)。
+    逆序执行(后注册的先清，符合数据依赖顺序)；单条失败不影响其它。
+    """
+
+    def __init__(self):
+        self._tasks = []  # [(kind, a, b)]
+
+    def add_sql(self, sql: str, args=None):
+        """注册一条清理 SQL(通常是 DELETE)"""
+        self._tasks.append(("sql", sql, args))
+
+    def add_table(self, table: str, where: str, args=None):
+        """便捷：删除某表满足条件的数据。例: add_table('orders', 'order_id=%s', [oid])"""
+        self._tasks.append(("sql", f"DELETE FROM {table} WHERE {where}", args))
+
+    def add_callback(self, func):
+        """注册任意清理回调，例: add_callback(lambda: OrderApi().delete_order(oid))"""
+        self._tasks.append(("call", func, None))
+
+    def run(self):
+        if not self._tasks:
+            return
+        from clients.db_client import DBClient
+
+        db = None
+        try:
+            for kind, a, b in reversed(self._tasks):  # 逆序清理
+                try:
+                    if kind == "sql":
+                        if db is None:
+                            db = DBClient()
+                        n = db.execute(a, b)
+                        log.info(f"清理数据 | {a} | 删除 {n} 行")
+                    else:
+                        a()
+                        log.info("清理回调已执行")
+                except Exception as e:  # noqa 单条失败不影响其它清理
+                    log.warning(f"清理失败(已忽略): {e}")
+        finally:
+            if db:
+                db.close()
+
+
+@pytest.fixture
+def clean_data():
+    """
+    自动清理 fixture：用例里注册要清的数据，用例结束(含失败)自动清理。
+    用法:
+        def test_create_order(clean_data):
+            resp = OrderApi().create_order(product_id=1, qty=1)
+            oid = resp.json()["data"]["order_id"]
+            clean_data.add_table("orders", "order_id=%s", [oid])   # 注册清理(创建后立刻注册)
+            Assert.status_code(resp, 200)
+        # 用例结束 → 自动 DELETE FROM orders WHERE order_id=oid
+    """
+    registry = CleanupRegistry()
+    yield registry
+    registry.run()

@@ -134,6 +134,28 @@ def test_store(store_code):
 
 > ⚠️ 提醒：入参/断言查库用 `SELECT`；如需造数据用 `db.execute(...)`，并记得用例后清理(teardown)。
 
+### 场景 D：自动清理脏数据（`clean_data` fixture）
+写数据的用例跑完会留下脏数据。用 `clean_data` fixture **注册清理任务**，用例结束（**即使失败**）自动按逆序清掉：
+
+```python
+def test_create_order(clean_data):
+    resp = OrderApi().create_order(product_id=1001, qty=2)
+    order_id = extract(resp.json(), "$.data.order_id")
+
+    # 创建后立刻注册清理(两种方式任选)
+    clean_data.add_table("orders", "order_id=%s", [order_id])      # ① 删库
+    # clean_data.add_callback(lambda: OrderApi().delete_order(order_id))  # ② 调删除接口
+
+    Assert.status_code(resp, 200)
+    # 用例结束 → 自动执行: DELETE FROM orders WHERE order_id=...
+```
+
+特点：
+- **逆序清理**（后注册先清，符合"先清子表再清主表"的依赖）
+- **单条失败不影响其它**清理
+- 用例**断言失败也会清**（注册在 teardown 执行）
+- 支持删库 SQL、删多表、调删除接口任意组合
+
 ---
 
 ## 3. 通知：推送测试结果到钉钉/企微
