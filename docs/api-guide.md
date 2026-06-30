@@ -154,9 +154,16 @@ class TestUserApi:
 | 方法 | 作用 |
 |------|------|
 | `Assert.status_code(resp, 200)` | 断言响应状态码 |
-| `Assert.json_value(resp, "name", "kiro")` | 断言响应里某字段的值 |
-| `Assert.contains(resp.json(), "token")` | 断言响应里包含某字段 |
-| `Assert.equal(a, b, "说明")` | 断言两个值相等 |
+| `Assert.json_value(resp, "name", "kiro")` | 断言响应**顶层**字段的值 |
+| `Assert.jsonpath(resp, "$.data.order.status", "PAID")` | 断言**嵌套**字段(JSONPath) |
+| `Assert.jsonpath_exists(resp, "$.data.token")` | 断言嵌套字段存在且非空 |
+| `Assert.contains(resp.json(), "token")` | 断言包含某字段 |
+| `Assert.equal(a, b, "说明")` / `not_equal` | 相等 / 不相等 |
+| `Assert.greater/less/between(...)` | 数值比较 / 范围 |
+| `Assert.approx(95.58, 95.580000)` | 浮点近似相等(金额/税率) |
+| `Assert.not_empty / is_none / not_none` | 空值校验 |
+| `Assert.length(list, 3)` | 长度校验 |
+| `Assert.match_regex(text, r"^SUCCESS")` | 正则匹配 |
 | `Assert.match_schema(resp, schema)` | 断言响应结构符合预期(契约测试) |
 
 ---
