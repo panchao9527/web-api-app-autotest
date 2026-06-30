@@ -230,8 +230,21 @@ class MineScreen(BaseScreen):
         return self.text(*self.TXT_NICKNAME)
 ```
 
-> `BaseScreen` 已封装 `find / click / input / text / is_displayed / swipe_up`，
-> 其中 `find()` 用**显式等待**，所以**不要写 `sleep`**——这是 App 稳定性的关键。
+> `BaseScreen` 用 `find()` 显式等待，所以**不要写 `sleep`**——这是 App 稳定性的关键。
+
+**`BaseScreen` 方法速查：**
+
+| 类别 | 方法 |
+|------|------|
+| 查找/等待 | `find`(等可点击) `wait_for`(等出现) |
+| 操作 | `click` `input` `clear` `text` `get_attribute` `is_displayed` |
+| 滑动 | `swipe_up/down/left/right` `pull_to_refresh` `scroll_to_find`(滚动找元素) |
+| 手势 | `long_press`(长按) `tap`(坐标点击) |
+| Toast | `get_toast` `assert_toast`(断言提示文本) |
+| 系统 | `back`(返回) `hide_keyboard`(隐藏键盘) `screenshot`(截图) |
+| 定位别名 | `ID` `ACCESSIBILITY_ID` `XPATH` `ANDROID_UIAUTOMATOR` `CLASS_NAME` |
+
+> 例：`self.scroll_to_find(*BTN_PAY)` 列表往下滚直到按钮出现；`self.assert_toast("支付成功")` 断言 toast。
 
 ### 用例（参考 `testcases/app/test_login_app.py`）
 
