@@ -94,12 +94,18 @@ class LoginPage(BasePage):
 
 | 方法 | 作用 |
 |------|------|
-| `self.open(path)` | 打开页面 |
-| `self.click(选择器)` | 点击 |
-| `self.fill(选择器, 文本)` | 输入 |
-| `self.text(选择器)` | 取文本 |
-| `self.expect_visible(选择器)` | 断言元素可见(自动等待) |
-| `self.expect_text(选择器, 文本)` | 断言文本包含 |
+| `open(path)` / `reload()` / `go_back()` | 打开/刷新/返回 |
+| `click` / `double_click` / `hover` | 点击/双击/悬停 |
+| `fill` / `type_text` / `clear` | 输入/逐字输入/清空 |
+| `check` / `uncheck` / `select` | 勾选/取消/下拉选择 |
+| `press` / `upload` / `scroll_into_view` | 按键/上传/滚动到元素 |
+| `text` / `texts` / `get_attribute` / `count` | 取文本/批量文本/属性/数量 |
+| `is_visible` / `is_enabled` / `is_checked` | 状态查询 |
+| `wait_for(selector, state)` | 等待元素到指定状态 |
+| `auto_accept_dialog()` / `screenshot()` | 处理原生弹窗/截图 |
+| `expect_visible` / `expect_hidden` | 断言可见/隐藏(自动等待) |
+| `expect_text` / `expect_value` / `expect_count` | 断言文本/值/数量 |
+| `expect_url` / `expect_title` | 断言 URL/标题 |
 
 > Playwright **自带智能等待**——元素没出现会自动等，所以**不要写 `sleep`**。
 
