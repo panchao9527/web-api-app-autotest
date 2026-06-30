@@ -51,6 +51,18 @@ class BasePage:
     def double_click(self, selector: str):
         self.page.dblclick(selector)
 
+    @allure.step("按按钮文字点击: {name}")
+    def click_button(self, name: str):
+        """按按钮文字点击(role=button)，适合自定义弹窗的'确定/取消/删除'按钮"""
+        log.info(f"点击按钮: {name}")
+        self.page.get_by_role("button", name=name).click()
+
+    @allure.step("按可见文本点击: {text}")
+    def click_text(self, text: str, exact: bool = False):
+        """按页面可见文本点击(链接/菜单/弹窗选项等)"""
+        log.info(f"按文本点击: {text}")
+        self.page.get_by_text(text, exact=exact).first.click()
+
     @allure.step("输入 [{text}] 到 {selector}")
     def fill(self, selector: str, text: str):
         log.info(f"输入: {selector} <- {text}")
@@ -132,7 +144,11 @@ class BasePage:
 
     # ================= 弹窗 / 截图 =================
     def auto_accept_dialog(self, accept: bool = True):
-        """自动处理浏览器原生弹窗(alert/confirm)：accept=True 确定，False 取消"""
+        """
+        处理【浏览器原生弹窗】(alert/confirm/prompt/beforeunload)：accept=True 确定，False 取消。
+        注意：现代前端的组件库/自研弹窗是普通 DOM，不走这里——直接用
+        click_button("确定") / click(弹窗按钮选择器) 即可。
+        """
         self.page.on("dialog", lambda d: d.accept() if accept else d.dismiss())
 
     @allure.step("截图: {name}")
