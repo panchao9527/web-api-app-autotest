@@ -16,7 +16,7 @@ description: 生成本框架规范的【接口场景级用例】—— 把一条
 把流程拆成有序步骤，识别每步属于哪个模块、调哪个接口。缺少的接口封装先按 `BaseApi` 规范补到 `api/`。
 
 ## 第 2 步：编排用例（核心套路）
-1. **共用一个 `HttpClient`**：`client = HttpClient()`，各模块 `XxxApi(client=client)`，使登录态(token/cookie)贯穿全程
+1. **共用一个 client**：用 `api_client` fixture(框架提供的共享 HttpClient)，各模块 `XxxApi(client=api_client)`，使登录态(token/cookie)贯穿全程
 2. **逐步执行**，每步用 `with allure.step("步骤N：...")` 包裹
 3. 每步断言：`Assert.status_code` + 业务码
 4. **接口间传参**：用 `utils.extractor.extract(resp.json(), "$.data.xxx")` 取上一步结果传给下一步
@@ -41,9 +41,8 @@ description: 生成本框架规范的【接口场景级用例】—— 把一条
 
 ## 参考模板（标准结构）
 ```python
-def test_order_e2e(self, env_settings):
-    client = HttpClient()                 # 全程共用,登录态贯穿
-    user, order = UserApi(client=client), OrderApi(client=client)
+def test_order_e2e(self, api_client, env_settings):
+    user, order = UserApi(client=api_client), OrderApi(client=api_client)  # 共享client,登录态贯穿
 
     with allure.step("登录"):
         Assert.status_code(user.login(env_settings.username, env_settings.password), 200)

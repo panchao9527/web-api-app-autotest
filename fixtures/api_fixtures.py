@@ -126,3 +126,21 @@ def clean_data():
     registry = CleanupRegistry()
     yield registry
     registry.run()
+
+
+
+@pytest.fixture
+def api_client():
+    """
+    提供一条用例内【共享的干净 HttpClient】(未登录)。
+    用途：场景级用例里多个接口模块共用同一个 client，让登录态(token/cookie)贯穿。
+    用法:
+        def test_flow(api_client):
+            user  = UserApi(client=api_client)
+            order = OrderApi(client=api_client)
+            user.login(...)          # set_token 后，order 的请求自动带上同一 token
+            order.create_order(...)
+    """
+    from core.http_client import HttpClient
+
+    return HttpClient()
