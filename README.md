@@ -70,7 +70,6 @@
 │   └── notify_from_junit.py #   CI 汇总junit并推送通知
 ├── docs/                    # 使用文档(11篇)
 ├── .kiro/skills/            # AI Skill(录制→PO / 单接口 / 场景级 生成)
-├── reports/                 # Allure 报告输出(运行生成)
 ├── conftest.py              # 全局 hook + fixture(失败自动截图/跑完自动通知)
 ├── pytest.ini               # pytest 配置 + 用例标记
 ├── requirements.txt          # 核心依赖(轻量)
@@ -79,6 +78,12 @@
 ├── .github/workflows/       # GitHub Actions CI
 ├── .gitlab-ci.yml           # GitLab CI
 └── Jenkinsfile              # Jenkins 流水线
+
+# 以下为运行时自动生成、已在 .gitignore 排除(仓库里看不到，属正常)：
+#   reports/       Allure 报告输出(跑 pytest 后)
+#   logs/          运行日志
+#   screenshots/   UI 失败截图 / traces/ 回放
+#   .venv/         虚拟环境
 ```
 
 ---
