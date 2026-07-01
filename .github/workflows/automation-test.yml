@@ -31,7 +31,7 @@ jobs:
           ENV: uat
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
-        run: pytest -m api --alluredir=./reports/allure-results
+        run: pytest -m api --alluredir=./reports/allure-results --junitxml=./reports/junit-api.xml
 
       - name: 上传 Allure 结果
         if: always()
@@ -39,6 +39,13 @@ jobs:
         with:
           name: allure-results-api
           path: reports/allure-results
+
+      - name: 上传 junit 结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-api
+          path: reports/junit-api.xml
 
   # ---------------- Web UI 测试 ----------------
   web-test:
@@ -63,7 +70,7 @@ jobs:
           ENV: uat
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
-        run: pytest -m web --alluredir=./reports/allure-results
+        run: pytest -m web --alluredir=./reports/allure-results --junitxml=./reports/junit-web.xml
 
       - name: 上传 Allure 结果
         if: always()
@@ -71,6 +78,13 @@ jobs:
         with:
           name: allure-results-web
           path: reports/allure-results
+
+      - name: 上传 junit 结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-web
+          path: reports/junit-web.xml
 
   # ---------------- 生成并发布 Allure 报告 ----------------
   report:
@@ -83,6 +97,7 @@ jobs:
       - name: 下载所有 Allure 结果
         uses: actions/download-artifact@v4
         with:
+          pattern: allure-results-*
           path: all-results
 
       - name: 合并结果
@@ -102,3 +117,40 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: allure-report
+
+  # ---------------- 汇总结果并推送通知(钉钉/企微/邮件) ----------------
+  notify:
+    needs: [api-test, web-test, report]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: 安装通知依赖
+        run: pip install requests PyYAML python-dotenv loguru jsonpath-ng
+
+      - name: 下载 junit 结果
+        uses: actions/download-artifact@v4
+        with:
+          pattern: junit-*
+          path: junit
+
+      - name: 汇总并推送测试结果
+        env:
+          ENV: uat
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          # 报告地址(GitHub Pages)，按你的仓库替换
+          REPORT_URL: https://panchao9527.github.io/web-api-app-autotest/
+        run: python scripts/notify_from_junit.py junit
