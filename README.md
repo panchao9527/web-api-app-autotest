@@ -21,44 +21,64 @@
 
 ```
 .
-├── config/              # 配置层
-│   ├── config.yaml      #   多环境 + 三端配置
-│   └── settings.py      #   配置加载器(单例 settings)
-├── core/                # 核心层(与业务无关，最稳定)
-│   ├── http_client.py   #   HTTP 客户端封装
-│   ├── assertions.py    #   自定义断言库
-│   ├── web_driver.py    #   Playwright 启动参数
-│   └── app_driver.py    #   Appium driver 工厂
-├── api/                 # 接口业务层(按模块封装)
+├── config/                  # 配置层
+│   ├── config.yaml          #   多环境(sit/uat/prod) + 三端配置
+│   └── settings.py          #   配置加载器(单例 settings)
+├── core/                    # 核心层(与业务无关，最稳定)
+│   ├── http_client.py       #   HTTP 客户端封装(自动日志/报告/打印返回)
+│   ├── assertions.py        #   自定义断言库(18个,含JSONPath/浮点近似/契约)
+│   ├── web_driver.py        #   Playwright 启动参数
+│   ├── app_driver.py        #   Appium driver 工厂
+│   └── network_recorder.py  #   UI流程抓接口序列
+├── api/                     # 接口业务层(按模块封装)
 │   ├── base_api.py
-│   └── user_api.py
-├── pages/               # Web 页面对象(PO 模式)
+│   ├── user_api.py
+│   └── sales_api.py
+├── pages/                   # Web 页面对象(PO 模式, BasePage 35方法)
 │   ├── base_page.py
-│   └── login_page.py
-├── screens/             # App 页面对象(移动端 PO 模式)
+│   ├── login_page.py
+│   └── demo_search_page.py  #   可运行示例(百度搜索)
+├── screens/                 # App 页面对象(PO 模式, BaseScreen 21方法)
 │   ├── base_screen.py
 │   └── login_screen.py
-├── clients/             # 测试基础设施客户端(DB/Redis/通知)
-│   ├── db_client.py     #   MySQL 查库断言/数据准备清理
-│   ├── redis_client.py  #   Redis 缓存校验
-│   └── notify.py        #   钉钉/企微 机器人通知
-├── testcases/           # 测试用例(只写业务逻辑)
-│   ├── api/
-│   ├── web/
-│   └── app/
-├── data/                # 测试数据(数据驱动)
-│   └── login_data.yaml
-├── fixtures/            # 共享 fixture(登录态复用、数据准备清理)
-│   └── api_fixtures.py
-├── utils/               # 工具(日志、数据加载、随机数据)
-├── docs/                # 使用文档(api/web/appium/infra-clients 指南)
-├── reports/             # Allure 报告输出
-├── conftest.py          # 全局 hook + fixture(失败自动截图)
-├── pytest.ini           # pytest 配置 + 用例标记
+├── clients/                 # 测试基础设施客户端
+│   ├── db_client.py         #   MySQL 查库断言/数据准备清理
+│   ├── redis_client.py      #   Redis 缓存校验
+│   ├── notify.py            #   钉钉/企微 机器人通知
+│   └── email_client.py      #   邮件报告
+├── testcases/               # 测试用例(只写业务逻辑)
+│   ├── api/                 #   test_login_api / test_sales
+│   ├── web/                 #   test_login_web / test_demo_search
+│   └── app/                 #   test_login_app
+├── data/                    # 测试数据(数据驱动)
+│   ├── login_data.yaml
+│   └── sales/               #   sales_payload.py + 门店列表(*.txt.example)
+├── fixtures/                # 共享 fixture
+│   └── api_fixtures.py      #   登录态/共享client/db/created_user/clean_data
+├── utils/                   # 通用工具
+│   ├── logger.py            #   日志(loguru)
+│   ├── data_loader.py       #   数据加载(yaml/json/excel/txt)
+│   ├── random_data.py       #   随机数据 + uuid/唯一ID
+│   ├── date_util.py         #   日期时间
+│   ├── extractor.py         #   JSONPath 提取
+│   ├── crypto_util.py       #   加密/签名
+│   ├── retry.py             #   轮询/重试
+│   ├── file_util.py         #   文件读写
+│   ├── dict_util.py         #   字典深取/对比/子集
+│   └── schema_util.py       #   响应生成JSON Schema
+├── scripts/                 # 脚本
+│   └── notify_from_junit.py #   CI 汇总junit并推送通知
+├── docs/                    # 使用文档(11篇)
+├── .kiro/skills/            # AI Skill(录制→PO / 单接口 / 场景级 生成)
+├── reports/                 # Allure 报告输出(运行生成)
+├── conftest.py              # 全局 hook + fixture(失败自动截图/跑完自动通知)
+├── pytest.ini               # pytest 配置 + 用例标记
 ├── requirements.txt          # 核心依赖(轻量)
 ├── requirements-optional.txt # 可选依赖(ES/Kafka/MQ 等，用到再装)
-├── Makefile             # 常用命令快捷方式
-└── .github/workflows/   # CI/CD
+├── Makefile                 # 常用命令快捷方式
+├── .github/workflows/       # GitHub Actions CI
+├── .gitlab-ci.yml           # GitLab CI
+└── Jenkinsfile              # Jenkins 流水线
 ```
 
 ---
