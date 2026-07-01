@@ -56,6 +56,7 @@ pipeline {
             // 汇总结果并推送钉钉/企微/邮件(凭据注入为环境变量)
             withCredentials([
                 string(credentialsId: 'DINGTALK_WEBHOOK', variable: 'DINGTALK_WEBHOOK'),
+                string(credentialsId: 'DINGTALK_SECRET',  variable: 'DINGTALK_SECRET'),
                 string(credentialsId: 'WECOM_WEBHOOK',    variable: 'WECOM_WEBHOOK'),
                 string(credentialsId: 'SMTP_HOST',        variable: 'SMTP_HOST'),
                 string(credentialsId: 'SMTP_PORT',        variable: 'SMTP_PORT'),

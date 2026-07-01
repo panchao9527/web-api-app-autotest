@@ -71,6 +71,7 @@ class Settings:
         notify_cfg = self._raw.get("notify", {})
         self.notify = {
             "dingtalk_webhook": os.getenv("DINGTALK_WEBHOOK", ""),
+            "dingtalk_secret": os.getenv("DINGTALK_SECRET", ""),
             "wecom_webhook": os.getenv("WECOM_WEBHOOK", ""),
             # 测试跑完是否自动推送(CI 建议开)：env NOTIFY_ON_FINISH=1 或 config.yaml
             "send_on_finish": os.getenv("NOTIFY_ON_FINISH", "").lower() in ("1", "true")

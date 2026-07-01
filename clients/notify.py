@@ -13,6 +13,12 @@
     n.send_test_result(total=52, passed=50, failed=2, duration="3m20s",
                        report_url="https://...")
 """
+import base64
+import hashlib
+import hmac
+import time
+import urllib.parse
+
 import requests
 
 from config.settings import settings
@@ -22,10 +28,28 @@ TIMEOUT = 10
 
 
 class Notifier:
-    def __init__(self, dingtalk_webhook: str = None, wecom_webhook: str = None):
+    def __init__(self, dingtalk_webhook: str = None, wecom_webhook: str = None,
+                 dingtalk_secret: str = None):
         notify = settings.notify
         self.dingtalk_webhook = dingtalk_webhook or notify.get("dingtalk_webhook", "")
         self.wecom_webhook = wecom_webhook or notify.get("wecom_webhook", "")
+        # 钉钉"加签"安全设置的密钥(SEC开头)；配了就自动算签名，没配走关键词模式
+        self.dingtalk_secret = dingtalk_secret or notify.get("dingtalk_secret", "")
+
+    def _dingtalk_url(self) -> str:
+        """钉钉 webhook：若配了加签密钥，自动追加 timestamp + sign"""
+        if not self.dingtalk_secret:
+            return self.dingtalk_webhook   # 未加签(用自定义关键词模式)
+        ts = str(round(time.time() * 1000))
+        string_to_sign = f"{ts}\n{self.dingtalk_secret}"
+        hmac_code = hmac.new(
+            self.dingtalk_secret.encode("utf-8"),
+            string_to_sign.encode("utf-8"),
+            hashlib.sha256,
+        ).digest()
+        sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
+        sep = "&" if "?" in self.dingtalk_webhook else "?"
+        return f"{self.dingtalk_webhook}{sep}timestamp={ts}&sign={sign}"
 
     # ---------------- 钉钉 ----------------
     def dingtalk_text(self, content: str):
@@ -33,14 +57,14 @@ class Notifier:
             log.warning("未配置钉钉 webhook，跳过通知")
             return
         payload = {"msgtype": "text", "text": {"content": content}}
-        return self._post(self.dingtalk_webhook, payload, "钉钉")
+        return self._post(self._dingtalk_url(), payload, "钉钉")
 
     def dingtalk_markdown(self, title: str, text: str):
         if not self.dingtalk_webhook:
             log.warning("未配置钉钉 webhook，跳过通知")
             return
         payload = {"msgtype": "markdown", "markdown": {"title": title, "text": text}}
-        return self._post(self.dingtalk_webhook, payload, "钉钉")
+        return self._post(self._dingtalk_url(), payload, "钉钉")
 
     # ---------------- 企业微信 ----------------
     def wecom_text(self, content: str):
