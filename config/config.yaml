@@ -76,3 +76,9 @@ app:
     deviceName: "iPhone 15"
     platformVersion: "17.0"
     bundleId: "com.example.app"
+
+
+# 测试结果通知（webhook/邮箱等敏感信息放 .env）
+notify:
+  send_on_finish: false      # true = 测试跑完自动推送结果摘要到已配置渠道(建议 CI 开启; 本地保持 false)
+  report_url: ""             # 报告地址(显示在通知里；CI 可用环境变量 REPORT_URL 覆盖)

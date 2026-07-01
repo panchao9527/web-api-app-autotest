@@ -108,3 +108,43 @@ def network_recorder(page):
     from core.network_recorder import NetworkRecorder
 
     return NetworkRecorder(page)
+
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """
+    测试全部跑完后：若开启 send_on_finish，自动把结果摘要推送到
+    已配置的钉钉/企微/邮件渠道。
+    - 开关：config.yaml 的 notify.send_on_finish 或环境变量 NOTIFY_ON_FINISH=1
+    - 本地默认不发(避免打扰)；CI 里打开即可
+    """
+    if not settings.notify.get("send_on_finish"):
+        return
+
+    import time
+
+    stats = terminalreporter.stats
+    passed = len(stats.get("passed", []))
+    failed = len(stats.get("failed", [])) + len(stats.get("error", []))
+    skipped = len(stats.get("skipped", []))
+    total = passed + failed + skipped
+    try:
+        duration = f"{time.time() - terminalreporter._sessionstarttime:.1f}s"
+    except Exception:  # noqa
+        duration = ""
+    report_url = settings.notify.get("report_url", "")
+
+    try:
+        from clients.notify import Notifier
+        Notifier().send_test_result(total=total, passed=passed, failed=failed,
+                                    duration=duration, report_url=report_url)
+    except Exception as e:  # noqa
+        log.warning(f"钉钉/企微通知失败: {e}")
+
+    if settings.email.get("host") and settings.email.get("to"):
+        try:
+            from clients.email_client import EmailSender
+            EmailSender().send_report(total=total, passed=passed, failed=failed,
+                                      duration=duration, report_url=report_url)
+        except Exception as e:  # noqa
+            log.warning(f"邮件通知失败: {e}")

@@ -67,10 +67,23 @@ class Settings:
         self.password = os.getenv("TEST_PASSWORD", "")
         self.api_token = os.getenv("API_TOKEN", "")
 
-        # ---- 通知 (webhook 含密钥，来自 .env) ----
+        # ---- 通知 (webhook/邮箱 含密钥，来自 .env；开关来自 config.yaml/env) ----
+        notify_cfg = self._raw.get("notify", {})
         self.notify = {
             "dingtalk_webhook": os.getenv("DINGTALK_WEBHOOK", ""),
             "wecom_webhook": os.getenv("WECOM_WEBHOOK", ""),
+            # 测试跑完是否自动推送(CI 建议开)：env NOTIFY_ON_FINISH=1 或 config.yaml
+            "send_on_finish": os.getenv("NOTIFY_ON_FINISH", "").lower() in ("1", "true")
+            or notify_cfg.get("send_on_finish", False),
+            "report_url": os.getenv("REPORT_URL", "") or notify_cfg.get("report_url", ""),
+        }
+        # 邮件 SMTP(来自 .env)
+        self.email = {
+            "host": os.getenv("SMTP_HOST", ""),
+            "port": os.getenv("SMTP_PORT", "465"),
+            "user": os.getenv("SMTP_USER", ""),
+            "password": os.getenv("SMTP_PASSWORD", ""),
+            "to": os.getenv("EMAIL_TO", ""),
         }
 
     @property
