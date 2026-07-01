@@ -179,14 +179,32 @@ n.send_test_result(total=52, passed=50, failed=2,
 
 ### 在 CI 里跑完自动推送
 
-可在流水线测试步骤后加一步，调用一个小脚本读取 pytest 结果并发送，例如：
-```python
-# scripts/notify_result.py (示例思路)
-from clients.notify import Notifier
-Notifier().send_test_result(total=..., passed=..., failed=...,
-                            report_url="${{ 报告地址 }}")
+框架已内置**测试跑完自动推送**（`conftest.py` 的 `pytest_terminal_summary` 钩子）：
+自动统计通过/失败数，推送到已配置的**钉钉 / 企微 / 邮件**渠道。
+
+开启方式（本地默认关闭，避免打扰）：
+- `config.yaml` 设 `notify.send_on_finish: true`，或
+- CI 里设环境变量 `NOTIFY_ON_FINISH=1`（并按需 `REPORT_URL=报告地址`）
+
+配置好渠道后（`.env` 填 webhook / SMTP），跑完即自动发，无需额外代码。
+
+## 4. 邮件通知（发送测试报告）
+
+`clients/email_client.py` 基于标准库 smtplib，无需额外依赖。`.env` 配置：
+```bash
+SMTP_HOST=smtp.xxx.com
+SMTP_PORT=465
+SMTP_USER=xxx@xxx.com
+SMTP_PASSWORD=授权码
+EMAIL_TO=a@x.com,b@x.com     # 多个逗号分隔
 ```
-（具体数字可从 pytest 的 `--junitxml` 结果或 Allure 汇总里解析。）
+手动发送：
+```python
+from clients.email_client import EmailSender
+EmailSender().send_report(total=50, passed=48, failed=2,
+                          duration="3m20s", report_url="http://...")
+```
+> 未配置 SMTP/收件人会自动跳过，不报错。开启 `send_on_finish` 后，测试结束会自动发。
 
 ---
 
