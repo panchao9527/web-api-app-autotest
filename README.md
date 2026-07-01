@@ -135,6 +135,7 @@ make report        # 本地生成并打开 Allure 报告
 > - 工具与 Fixture 速查：**[docs/utils-fixtures.md](docs/utils-fixtures.md)**
 > - 团队代码规范：**[docs/coding-standards.md](docs/coding-standards.md)**
 > - UI vs 接口 测试分工策略：**[docs/ui-api-strategy.md](docs/ui-api-strategy.md)**
+> - CI/CD 集成(GitHub/GitLab/Jenkins)：**[docs/ci.md](docs/ci.md)**
 
 ### 新增接口测试
 1. 在 `api/` 下封装接口调用(继承 `BaseApi`)
