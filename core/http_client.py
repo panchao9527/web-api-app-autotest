@@ -1,58 +1,84 @@
-"""
-HTTP 客户端封装 (基于 requests.Session)
-- 统一 base_url、超时、请求头、鉴权
-- 自动记录请求/响应日志，并附加到 Allure 报告
-- 所有 API 业务类都基于它，便于统一维护
-"""
+"""统一 HTTP 客户端，提供日志、报告、脱敏和资源管理。"""
+
 import json
+from urllib.parse import urlsplit, urlunsplit
 
 import allure
 import requests
 
 from config.settings import settings
 from utils.logger import log
+from utils.redaction import redact, redact_text, redact_url
 
 
 class HttpClient:
-    def __init__(self, base_url: str = None, token: str = None):
+    def __init__(
+        self,
+        base_url: str | None = None,
+        token: str | None = None,
+        session: requests.Session | None = None,
+        timeout: float | None = None,
+    ):
         self.base_url = (base_url or settings.api_base_url).rstrip("/")
-        self.session = requests.Session()
-        self.timeout = settings.timeout
-
-        # 默认请求头
+        self.session = session or requests.Session()
+        self.timeout = timeout if timeout is not None else settings.timeout
         self.session.headers.update({"Content-Type": "application/json"})
-        token = token or settings.api_token
-        if token:
-            self.session.headers.update({"Authorization": f"Bearer {token}"})
+        selected_token = token or settings.api_token
+        if selected_token:
+            self.set_token(selected_token)
 
-    def set_token(self, token: str):
-        """登录后回填 token"""
+    def set_token(self, token: str) -> None:
         self.session.headers.update({"Authorization": f"Bearer {token}"})
 
+    def _build_url(self, path: str) -> str:
+        parsed = urlsplit(path)
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            return path
+        base = urlsplit(self.base_url)
+        base_path = base.path.rstrip("/")
+        relative_path = parsed.path.lstrip("/")
+        joined_path = "/".join(part for part in (base_path, relative_path) if part)
+        if not joined_path.startswith("/"):
+            joined_path = f"/{joined_path}"
+        return urlunsplit((base.scheme, base.netloc, joined_path, parsed.query, parsed.fragment))
+
     def request(self, method: str, path: str, **kwargs) -> requests.Response:
-        url = path if path.startswith("http") else f"{self.base_url}{path}"
+        url = self._build_url(path)
         kwargs.setdefault("timeout", self.timeout)
+        safe_url = redact_url(url)
+        safe_request = self._request_detail(method, url, kwargs)
 
-        # 记录请求
-        log.info(f"➡️  {method.upper()} {url}")
+        log.info(f"HTTP 请求 | {method.upper()} {safe_url}")
         if kwargs.get("params"):
-            log.debug(f"   params: {kwargs['params']}")
-        if kwargs.get("json"):
-            log.debug(f"   body: {kwargs['json']}")
+            log.debug(f"请求参数: {redact(kwargs['params'])}")
+        if kwargs.get("json") is not None:
+            log.debug(f"请求体: {redact(kwargs['json'])}")
 
-        resp = self.session.request(method, url, **kwargs)
+        try:
+            response = self.session.request(method, url, **kwargs)
+        except requests.RequestException as exc:
+            detail = {"request": safe_request, "error": redact_text(str(exc))}
+            self._attach_json(detail, f"{method.upper()} {safe_url} 请求异常")
+            log.error(f"HTTP 请求异常 | {method.upper()} {safe_url} | {redact_text(str(exc))}")
+            raise
 
-        # 记录响应
-        log.info(f"⬅️  {resp.status_code} | 耗时 {resp.elapsed.total_seconds():.2f}s")
-        # 全局开关：是否打印返回报文(config.yaml 的 log_response)
+        safe_body = self._response_body(response)
+        log.info(
+            f"HTTP 响应 | {response.status_code} | 耗时 {response.elapsed.total_seconds():.2f}s"
+        )
         if settings.log_response:
-            body = resp.text or ""
-            max_len = settings.log_response_max
-            if len(body) > max_len:
-                body = body[:max_len] + f"...(共{len(resp.text)}字符,已截断)"
-            log.info(f"   响应: {body}")
-        self._attach_to_allure(method, url, kwargs, resp)
-        return resp
+            log.info(f"响应: {self._limit_text(self._display_text(safe_body))}")
+        self._attach_json(
+            {
+                "request": safe_request,
+                "response": {
+                    "status_code": response.status_code,
+                    "body": self._limit_value(safe_body),
+                },
+            },
+            f"{method.upper()} {safe_url}",
+        )
+        return response
 
     def get(self, path, **kwargs):
         return self.request("GET", path, **kwargs)
@@ -69,27 +95,61 @@ class HttpClient:
     def patch(self, path, **kwargs):
         return self.request("PATCH", path, **kwargs)
 
+    def close(self) -> None:
+        self.session.close()
+
+    def __enter__(self) -> "HttpClient":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
+
+    def _request_detail(self, method: str, url: str, kwargs: dict) -> dict:
+        headers = dict(getattr(self.session, "headers", {}))
+        headers.update(kwargs.get("headers") or {})
+        return {
+            "method": method.upper(),
+            "url": redact_url(url),
+            "headers": redact(headers),
+            "params": redact(kwargs.get("params")),
+            "body": redact(kwargs.get("json", kwargs.get("data"))),
+        }
+
     @staticmethod
-    def _attach_to_allure(method, url, kwargs, resp):
-        """把请求/响应详情附加到 Allure，失败时方便排查"""
+    def _response_body(response):
+        content_type = response.headers.get("Content-Type", "").lower()
+        if "application/json" in content_type:
+            try:
+                return redact(response.json())
+            except ValueError:
+                pass
+        return redact_text(response.text or "")
+
+    @staticmethod
+    def _display_text(value) -> str:
+        if isinstance(value, str):
+            return value
+        return json.dumps(value, ensure_ascii=False)
+
+    @staticmethod
+    def _limit_text(text: str) -> str:
+        maximum = max(int(settings.log_response_max), 1)
+        if len(text) <= maximum:
+            return text
+        return f"{text[:maximum]}...(共{len(text)}字符，已截断)"
+
+    @classmethod
+    def _limit_value(cls, value):
+        text = cls._display_text(value)
+        return value if len(text) <= int(settings.log_response_max) else cls._limit_text(text)
+
+    @staticmethod
+    def _attach_json(detail: dict, name: str) -> None:
         try:
-            detail = {
-                "request": {
-                    "method": method.upper(),
-                    "url": url,
-                    "params": kwargs.get("params"),
-                    "body": kwargs.get("json"),
-                },
-                "response": {
-                    "status_code": resp.status_code,
-                    "body": resp.json() if "application/json"
-                    in resp.headers.get("Content-Type", "") else resp.text[:500],
-                },
-            }
             allure.attach(
                 json.dumps(detail, ensure_ascii=False, indent=2),
-                name=f"{method.upper()} {url}",
+                name=name,
                 attachment_type=allure.attachment_type.JSON,
             )
-        except Exception as e:  # noqa
-            log.warning(f"Allure 附加失败: {e}")
+        except Exception as exc:
+            log.warning(f"Allure 附加失败: {redact_text(str(exc))}")

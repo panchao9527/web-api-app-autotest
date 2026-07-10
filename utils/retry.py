@@ -7,7 +7,9 @@
     # 轮询直到查到订单，最多等 10 秒，每 1 秒查一次
     order = wait_until(lambda: query_order(oid), timeout=10, interval=1)
 """
+
 import time
+from functools import wraps
 
 from utils.logger import log
 
@@ -36,7 +38,13 @@ def retry(times: int = 3, delay: float = 1, exceptions=(Exception,)):
     @retry(times=3, delay=2)
     def call_flaky_api(): ...
     """
+    if not isinstance(times, int) or isinstance(times, bool) or times < 1:
+        raise ValueError(f"times 必须是大于等于 1 的整数，实际值: {times!r}")
+    if delay < 0:
+        raise ValueError(f"delay 不能小于 0，实际值: {delay!r}")
+
     def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
             last_exc = None
             for i in range(1, times + 1):
@@ -44,8 +52,13 @@ def retry(times: int = 3, delay: float = 1, exceptions=(Exception,)):
                     return func(*args, **kwargs)
                 except exceptions as e:
                     last_exc = e
-                    log.warning(f"{func.__name__} 第{i}次失败: {e}，{delay}s 后重试")
-                    time.sleep(delay)
+                    if i < times:
+                        log.warning(f"{func.__name__} 第{i}次失败: {e}，{delay}s 后重试")
+                        time.sleep(delay)
+                    else:
+                        log.error(f"{func.__name__} 重试 {times} 次后仍失败: {e}")
             raise last_exc
+
         return wrapper
+
     return decorator

@@ -3,6 +3,7 @@ API 业务基类
 - 所有业务 API 类继承它，共享同一个 HttpClient 实例
 - 在这里放跨模块通用的方法
 """
+
 from core.http_client import HttpClient
 
 

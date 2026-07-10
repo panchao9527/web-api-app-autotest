@@ -27,10 +27,10 @@
 git clone https://github.com/panchao9527/web-api-app-autotest.git
 cd web-api-app-autotest
 
-# 虚拟环境 + 依赖
+# 虚拟环境 + Web 依赖
 python -m venv .venv
 source .venv/Scripts/activate      # Git Bash; PowerShell 用 .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-web.txt
 
 # 关键: 装浏览器内核(Playwright 自带浏览器)
 playwright install chromium
@@ -59,7 +59,7 @@ web:
   viewport:
     width: 1920
     height: 1080
-  trace: true             # 失败时保留操作轨迹，可回放
+  trace: true             # 未显式传 --tracing 时，失败保留操作轨迹
 ```
 
 > **新手调试建议**：先把 `headless: false`、`slow_mo: 500`，这样能**亲眼看到**浏览器自动操作，方便排查。调通后再改回 `headless: true`。
@@ -321,7 +321,7 @@ pytest testcases/web/test_search_web.py
 pytest -m web                 # 只跑 Web 用例
 pytest -m "web and smoke"     # Web 冒烟
 pytest testcases/web/test_login_web.py    # 单个文件
-pytest -m web --headed        # 显示浏览器窗口跑(临时调试，覆盖 headless)
+python scripts/automation.py test --type web --env uat --headed
 ```
 
 ---
@@ -335,7 +335,7 @@ allure serve reports/allure-results
 Web 用例**失败时框架会自动截图**附到报告里，一眼看出卡在哪。
 
 ### Playwright Trace（强力调试）
-`config.yaml` 里 `trace: true` 时，失败会留下轨迹文件，可逐帧回放：
+`config.yaml` 里 `trace: true` 且命令行未覆盖 tracing 时，失败会留下轨迹文件：
 ```bash
 playwright show-trace 轨迹文件路径.zip
 ```

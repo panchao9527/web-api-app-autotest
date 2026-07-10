@@ -3,6 +3,7 @@
 - 汇总所有 junit 报告的通过/失败数，合并成一条推送到钉钉/企微/邮件
 - 用法: python scripts/notify_from_junit.py <junit结果目录>
 """
+
 import glob
 import os
 import sys
@@ -21,11 +22,23 @@ def collect(junit_dir: str):
             root = ET.parse(path).getroot()
         except Exception:  # noqa
             continue
-        for s in root.iter("testsuite"):
-            total += int(s.get("tests", 0) or 0)
-            failed += int(s.get("failures", 0) or 0) + int(s.get("errors", 0) or 0)
-            skipped += int(s.get("skipped", 0) or 0)
-            duration += float(s.get("time", 0) or 0)
+        testcases = list(root.iter("testcase"))
+        if testcases:
+            for case in testcases:
+                total += 1
+                duration += float(case.get("time", 0) or 0)
+                if case.find("failure") is not None or case.find("error") is not None:
+                    failed += 1
+                elif case.find("skipped") is not None:
+                    skipped += 1
+            continue
+
+        leaf_suites = [suite for suite in root.iter("testsuite") if not suite.findall("testsuite")]
+        for suite in leaf_suites:
+            total += int(suite.get("tests", 0) or 0)
+            failed += int(suite.get("failures", 0) or 0) + int(suite.get("errors", 0) or 0)
+            skipped += int(suite.get("skipped", 0) or 0)
+            duration += float(suite.get("time", 0) or 0)
     passed = total - failed - skipped
     return total, passed, failed, duration
 
@@ -44,18 +57,23 @@ def main():
     # 钉钉/企微
     try:
         from clients.notify import Notifier
-        Notifier().send_test_result(total=total, passed=passed, failed=failed,
-                                    duration=dur, report_url=report_url)
+
+        Notifier().send_test_result(
+            total=total, passed=passed, failed=failed, duration=dur, report_url=report_url
+        )
     except Exception as e:  # noqa
         print(f"钉钉/企微通知失败: {e}")
 
     # 邮件(配了才发)
     try:
         from config.settings import settings
+
         if settings.email.get("host") and settings.email.get("to"):
             from clients.email_client import EmailSender
-            EmailSender().send_report(total=total, passed=passed, failed=failed,
-                                      duration=dur, report_url=report_url)
+
+            EmailSender().send_report(
+                total=total, passed=passed, failed=failed, duration=dur, report_url=report_url
+            )
     except Exception as e:  # noqa
         print(f"邮件通知失败: {e}")
 

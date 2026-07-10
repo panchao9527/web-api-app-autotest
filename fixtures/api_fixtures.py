@@ -3,10 +3,12 @@ API 相关共享 fixture
 - logged_in_client: 登录态复用，避免每个用例重复登录
 - 通过 pytest_plugins 在 conftest 注册
 """
+
 import pytest
 
 from api.user_api import UserApi
 from config.settings import settings
+from core.safety import ensure_write_allowed
 from utils.logger import log
 
 
@@ -20,8 +22,11 @@ def logged_in_client():
     resp = user_api.login(settings.username, settings.password)
     if resp.status_code != 200:
         log.warning("登录态预置失败，需要鉴权的用例可能失败")
-    yield user_api.client
-    log.info("会话结束，清理登录态")
+    try:
+        yield user_api.client
+    finally:
+        user_api.client.close()
+        log.info("会话结束，登录客户端已关闭")
 
 
 @pytest.fixture
@@ -33,6 +38,7 @@ def created_user(logged_in_client):
     from api.user_api import UserApi
     from utils.random_data import random_name
 
+    ensure_write_allowed(settings.env, "created_user")
     api = UserApi(client=logged_in_client)
     resp = api.create_user(name=random_name(), job="auto-test")
     user_id = resp.json().get("id")
@@ -44,7 +50,6 @@ def created_user(logged_in_client):
     if user_id:
         api.delete_user(user_id)
         log.info(f"清理测试用户: id={user_id}")
-
 
 
 @pytest.fixture
@@ -59,10 +64,21 @@ def db():
     """
     from clients.db_client import DBClient
 
+    ensure_write_allowed(settings.env, "db fixture")
     client = DBClient()
-    yield client
-    client.close()
+    try:
+        yield client
+    finally:
+        client.close()
 
+
+class CleanupError(RuntimeError):
+    """一项或多项测试数据清理失败。"""
+
+    def __init__(self, errors: list[Exception]):
+        self.errors = errors
+        detail = "; ".join(str(error) for error in errors)
+        super().__init__(f"测试数据清理失败: {detail}")
 
 
 class CleanupRegistry:
@@ -93,6 +109,7 @@ class CleanupRegistry:
         from clients.db_client import DBClient
 
         db = None
+        errors = []
         try:
             for kind, a, b in reversed(self._tasks):  # 逆序清理
                 try:
@@ -105,10 +122,13 @@ class CleanupRegistry:
                         a()
                         log.info("清理回调已执行")
                 except Exception as e:  # noqa 单条失败不影响其它清理
-                    log.warning(f"清理失败(已忽略): {e}")
+                    errors.append(e)
+                    log.error(f"清理失败: {e}")
         finally:
             if db:
                 db.close()
+        if errors:
+            raise CleanupError(errors)
 
 
 @pytest.fixture
@@ -123,10 +143,10 @@ def clean_data():
             Assert.status_code(resp, 200)
         # 用例结束 → 自动 DELETE FROM orders WHERE order_id=oid
     """
+    ensure_write_allowed(settings.env, "clean_data")
     registry = CleanupRegistry()
     yield registry
     registry.run()
-
 
 
 @pytest.fixture
@@ -143,4 +163,8 @@ def api_client():
     """
     from core.http_client import HttpClient
 
-    return HttpClient()
+    client = HttpClient()
+    try:
+        yield client
+    finally:
+        client.close()

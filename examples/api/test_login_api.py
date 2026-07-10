@@ -3,6 +3,7 @@
 - 一套逻辑跑 login_data.yaml 里的多组数据
 - 演示：parametrize 数据驱动 + 自定义断言 + Allure 标记
 """
+
 import allure
 import pytest
 
@@ -17,7 +18,6 @@ login_data = load_yaml("login_data.yaml")
 @allure.feature("登录接口")
 @pytest.mark.api
 class TestLoginApi:
-
     @allure.story("登录场景覆盖")
     @pytest.mark.parametrize("case", login_data, ids=[c["case_id"] for c in login_data])
     def test_login(self, case):
@@ -37,7 +37,6 @@ class TestLoginApi:
 @allure.feature("用户管理接口")
 @pytest.mark.api
 class TestUserApi:
-
     @allure.story("查询用户")
     @pytest.mark.smoke
     @pytest.mark.p0

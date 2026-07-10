@@ -4,10 +4,29 @@ Playwright 启动参数辅助
   这里集中提供启动参数(headless/viewport/slow_mo)，由 conftest 注入。
 - 也可用于非 pytest-playwright 场景手动启动浏览器。
 """
+
 from playwright.sync_api import sync_playwright
 
 from config.settings import settings
 from utils.logger import log
+
+
+def merge_launch_args(yaml_args: dict, cli_args: dict) -> dict:
+    """合并浏览器启动参数，命令行参数优先。"""
+    return {**yaml_args, **cli_args}
+
+
+def configured_browsers(cli_browsers: list[str], yaml_browser: str) -> list[str]:
+    """命令行未选择浏览器时使用 YAML 配置。"""
+    return list(cli_browsers) if cli_browsers else [yaml_browser]
+
+
+def configured_tracing(current_value: str, argv: list[str], trace_enabled: bool) -> str:
+    """用户未显式指定 tracing 时，才应用 YAML 的 trace 开关。"""
+    explicit = any(arg == "--tracing" or arg.startswith("--tracing=") for arg in argv)
+    if explicit:
+        return current_value
+    return "retain-on-failure" if trace_enabled else current_value
 
 
 def browser_launch_args() -> dict:

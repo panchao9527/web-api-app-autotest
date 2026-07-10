@@ -1,0 +1,5 @@
+# Web 测试；自动包含 API/核心依赖
+-r requirements-api.txt
+playwright==1.49.1
+pytest-playwright==0.6.2
+

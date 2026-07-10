@@ -12,6 +12,7 @@ MySQL 数据库客户端（数据校验/数据准备用）
         one  = db.query_one("SELECT count(*) AS c FROM orders")
         n    = db.execute("DELETE FROM orders WHERE id=%s", [order_id])
 """
+
 from config.settings import settings
 from utils.logger import log
 

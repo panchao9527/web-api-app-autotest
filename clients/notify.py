@@ -13,6 +13,7 @@
     n.send_test_result(total=52, passed=50, failed=2, duration="3m20s",
                        report_url="https://...")
 """
+
 import base64
 import hashlib
 import hmac
@@ -28,8 +29,9 @@ TIMEOUT = 10
 
 
 class Notifier:
-    def __init__(self, dingtalk_webhook: str = None, wecom_webhook: str = None,
-                 dingtalk_secret: str = None):
+    def __init__(
+        self, dingtalk_webhook: str = None, wecom_webhook: str = None, dingtalk_secret: str = None
+    ):
         notify = settings.notify
         self.dingtalk_webhook = dingtalk_webhook or notify.get("dingtalk_webhook", "")
         self.wecom_webhook = wecom_webhook or notify.get("wecom_webhook", "")
@@ -39,7 +41,7 @@ class Notifier:
     def _dingtalk_url(self) -> str:
         """钉钉 webhook：若配了加签密钥，自动追加 timestamp + sign"""
         if not self.dingtalk_secret:
-            return self.dingtalk_webhook   # 未加签(用自定义关键词模式)
+            return self.dingtalk_webhook  # 未加签(用自定义关键词模式)
         ts = str(round(time.time() * 1000))
         string_to_sign = f"{ts}\n{self.dingtalk_secret}"
         hmac_code = hmac.new(
@@ -82,9 +84,15 @@ class Notifier:
         return self._post(self.wecom_webhook, payload, "企微")
 
     # ---------------- 高层封装：推送测试结果摘要 ----------------
-    def send_test_result(self, total: int, passed: int, failed: int,
-                         duration: str = "", report_url: str = "",
-                         title: str = "自动化测试报告"):
+    def send_test_result(
+        self,
+        total: int,
+        passed: int,
+        failed: int,
+        duration: str = "",
+        report_url: str = "",
+        title: str = "自动化测试报告",
+    ):
         """构造一份测试结果摘要，同时推送到已配置的钉钉/企微"""
         pass_rate = f"{(passed / total * 100):.1f}%" if total else "N/A"
         emoji = "✅" if failed == 0 else "⚠️"

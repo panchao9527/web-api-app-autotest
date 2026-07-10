@@ -1,32 +1,4 @@
-# ===== 测试框架核心 =====
-pytest==8.3.4
-pytest-xdist==3.6.1            # 并发执行
-pytest-rerunfailures==15.0     # 失败自动重试
-pytest-ordering==0.6           # 用例排序
-
-# ===== 报告 =====
-allure-pytest==2.13.5
-
-# ===== API 测试 =====
-requests==2.32.3
-jsonschema==4.23.0             # 响应结构校验
-
-# ===== Web 测试 =====
-playwright==1.49.1
-pytest-playwright==0.6.2
-
-# ===== App 测试 =====
-Appium-Python-Client==4.5.1
-selenium==4.27.1
-
-# ===== 数据 / 配置 =====
-PyYAML==6.0.2
-PyMySQL==1.1.1                 # MySQL 数据校验
-redis==5.2.1                   # Redis 读写/校验
-openpyxl==3.1.5                # excel 数据驱动
-Faker==33.1.0                  # 造测试数据
-python-dotenv==1.0.1           # 敏感信息环境变量
-
-# ===== 工具 =====
-loguru==0.7.3                  # 日志
-jsonpath-ng==1.7.0             # 提取响应字段
+# 新手一次安装全部运行依赖
+-r requirements-web.txt
+-r requirements-app.txt
+-r requirements-infra.txt

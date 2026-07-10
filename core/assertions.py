@@ -4,6 +4,7 @@
 - 覆盖：通用断言 / 数值比较 / 空值长度 / 文本正则 / 浮点近似 / 接口响应 / JSONPath 嵌套取值 / Schema 契约
 - 用法: from core.assertions import Assert
 """
+
 import re
 
 import allure
@@ -139,6 +140,7 @@ class Assert:
         解决 json_value 只能取顶层的局限。
         """
         from utils.extractor import extract
+
         actual = extract(_to_data(resp), expr)
         log.info(f"断言JSONPath | {expr}: 实际={actual} 期望={expected}")
         assert actual == expected, f"{expr} 不符 | 期望 {expected}，实际 {actual}"
@@ -148,6 +150,7 @@ class Assert:
     def jsonpath_exists(resp, expr):
         """断言某嵌套字段存在且非空(如返回里必须有 token/order_id)"""
         from utils.extractor import extract
+
         actual = extract(_to_data(resp), expr)
         log.info(f"断言JSONPath存在 | {expr}: {actual}")
         assert actual is not None and actual != "", f"{expr} 不存在或为空"
@@ -160,4 +163,4 @@ class Assert:
             validate(instance=_to_data(resp), schema=schema)
             log.info("JSON Schema 校验通过")
         except ValidationError as e:
-            raise AssertionError(f"响应结构不符合 schema: {e.message}")
+            raise AssertionError(f"响应结构不符合 schema: {e.message}") from e

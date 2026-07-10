@@ -3,6 +3,7 @@
 - 读写文本/JSON、目录操作、拼项目路径
 - 用法: from utils.file_util import read_json, write_json, ensure_dir
 """
+
 import json
 from pathlib import Path
 
@@ -25,7 +26,7 @@ def write_text(path, content: str):
 
 
 def read_json(path):
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 

@@ -3,6 +3,10 @@
 - 造唯一用户名/邮箱/手机号等，避免用例间数据冲突
 - 中文场景用 zh_CN
 """
+
+import time
+import uuid
+
 from faker import Faker
 
 fake = Faker("zh_CN")
@@ -31,11 +35,6 @@ def random_password(length: int = 12) -> str:
 
 def random_address() -> str:
     return fake.address()
-
-
-
-import time
-import uuid
 
 
 def uuid_str() -> str:

@@ -9,6 +9,7 @@
         network_recorder.print_summary()       # 打印接口调用序列
         network_recorder.save("captured_apis.json")
 """
+
 import json
 
 from utils.logger import log

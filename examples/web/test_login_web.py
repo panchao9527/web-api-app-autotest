@@ -4,6 +4,7 @@ Web 登录 UI 测试 (Playwright + PO 模式 示例)
 - page fixture 由 pytest-playwright 提供，失败自动截图(见 conftest)
 - UI 自动化原则：少而精，只覆盖核心链路
 """
+
 import allure
 import pytest
 from playwright.sync_api import Page
@@ -15,7 +16,6 @@ from pages.login_page import LoginPage
 @allure.feature("登录页面")
 @pytest.mark.web
 class TestLoginWeb:
-
     @allure.story("登录成功")
     @pytest.mark.smoke
     @pytest.mark.p0

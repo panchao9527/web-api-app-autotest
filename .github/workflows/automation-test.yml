@@ -1,149 +1,153 @@
 name: Automation Tests
 
-# 触发：push/PR 到 main，以及每天定时回归
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   schedule:
-    - cron: "0 2 * * *"   # 每天 02:00 UTC 跑全量回归
-  workflow_dispatch:       # 支持手动触发
+    - cron: "0 18 * * *" # 北京时间每天 02:00
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  ENV: uat
+  TEST_MARKER: ${{ github.event_name == 'schedule' && 'regression' || 'smoke' }}
 
 jobs:
-  # ---------------- 接口测试 ----------------
+  framework-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: 静态检查
+        if: matrix.python-version == '3.12'
+        run: |
+          python -m ruff format --check .
+          python -m ruff check .
+      - name: 离线框架自测
+        env:
+          PYTEST_ADDOPTS: --alluredir=reports/allure-framework --clean-alluredir --junitxml=reports/junit-framework.xml
+        run: python scripts/automation.py self-test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-results-framework-${{ matrix.python-version }}
+          path: reports/allure-framework
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-framework-${{ matrix.python-version }}
+          path: reports/junit-framework.xml
+          if-no-files-found: ignore
+
   api-test:
+    needs: framework-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: 安装 Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
-
-      - name: 安装依赖
-        run: pip install -r requirements.txt
-
-      - name: 运行接口测试
+          cache: pip
+      - run: pip install -r requirements-api.txt
+      - name: 运行 API 测试
         env:
-          ENV: uat
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
-        run: pytest -m api --alluredir=./reports/allure-results --junitxml=./reports/junit-api.xml
-
-      - name: 上传 Allure 结果
+          PYTEST_ADDOPTS: --alluredir=reports/allure-api --clean-alluredir --junitxml=reports/junit-api.xml
+        run: python scripts/automation.py test --type api --env uat --marker "$TEST_MARKER"
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: allure-results-api
-          path: reports/allure-results
-
-      - name: 上传 junit 结果
+          path: reports/allure-api
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: junit-api
           path: reports/junit-api.xml
+          if-no-files-found: ignore
 
-  # ---------------- Web UI 测试 ----------------
   web-test:
+    needs: framework-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: 安装 Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
-
-      - name: 安装依赖
-        run: pip install -r requirements.txt
-
-      - name: 安装 Playwright 浏览器
-        run: playwright install --with-deps chromium
-
+          cache: pip
+      - run: pip install -r requirements-web.txt
+      - run: playwright install --with-deps chromium
       - name: 运行 Web 测试
         env:
-          ENV: uat
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
-        run: pytest -m web --alluredir=./reports/allure-results --junitxml=./reports/junit-web.xml
-
-      - name: 上传 Allure 结果
+          PYTEST_ADDOPTS: --alluredir=reports/allure-web --clean-alluredir --junitxml=reports/junit-web.xml
+        run: python scripts/automation.py test --type web --env uat --marker "$TEST_MARKER"
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: allure-results-web
-          path: reports/allure-results
-
-      - name: 上传 junit 结果
+          path: reports/allure-web
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: junit-web
           path: reports/junit-web.xml
+          if-no-files-found: ignore
 
-  # ---------------- 生成并发布 Allure 报告 ----------------
   report:
-    needs: [api-test, web-test]
-    runs-on: ubuntu-latest
+    needs: [framework-test, api-test, web-test]
     if: always()
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: 下载所有 Allure 结果
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           pattern: allure-results-*
-          path: all-results
-
-      - name: 合并结果
-        run: |
-          mkdir -p reports/allure-results
-          find all-results -type f -exec cp {} reports/allure-results/ \;
-
-      - name: 生成 Allure 报告
-        uses: simple-elf/allure-report-action@v1.7
+          path: reports/allure-results
+          merge-multiple: true
+      - uses: simple-elf/allure-report-action@v1.7
         with:
           allure_results: reports/allure-results
           allure_report: allure-report
-
-      - name: 发布到 GitHub Pages
-        if: always()
-        uses: peaceiris/actions-gh-pages@v4
+      - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: allure-report
 
-  # ---------------- 汇总结果并推送通知(钉钉/企微/邮件) ----------------
   notify:
-    needs: [api-test, web-test, report]
-    runs-on: ubuntu-latest
+    needs: [framework-test, api-test, web-test, report]
     if: always()
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: 安装 Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
-
-      - name: 安装通知依赖
-        run: pip install requests PyYAML python-dotenv loguru jsonpath-ng
-
-      - name: 下载 junit 结果
-        uses: actions/download-artifact@v4
+      - run: pip install -r requirements-api.txt
+      - uses: actions/download-artifact@v4
         with:
           pattern: junit-*
           path: junit
-
-      - name: 汇总并推送测试结果
+          merge-multiple: true
+      - name: 汇总并推送
         env:
-          ENV: uat
           DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
           DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
           WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
@@ -152,6 +156,5 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
-          # 报告地址(GitHub Pages)，按你的仓库替换
-          REPORT_URL: https://panchao9527.github.io/web-api-app-autotest/
+          REPORT_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
         run: python scripts/notify_from_junit.py junit

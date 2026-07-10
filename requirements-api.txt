@@ -1,0 +1,14 @@
+# API 测试与框架核心
+pytest==8.3.4
+pytest-xdist==3.6.1
+pytest-rerunfailures==15.0
+allure-pytest==2.13.5
+requests==2.32.3
+jsonschema==4.23.0
+PyYAML==6.0.2
+openpyxl==3.1.5
+Faker==33.1.0
+python-dotenv==1.0.1
+loguru==0.7.3
+jsonpath-ng==1.7.0
+

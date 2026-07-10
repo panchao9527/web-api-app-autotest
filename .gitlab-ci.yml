@@ -1,85 +1,110 @@
-# =====================================================================
-# GitLab CI 流水线（与 .github/workflows/automation-test.yml 等价）
-# 阶段: test(接口+Web) -> report(生成Allure发布Pages) -> notify(汇总推送)
-#
-# 【使用前准备】在 项目 Settings -> CI/CD -> Variables 里配置(按需)：
-#   TEST_USERNAME / TEST_PASSWORD    测试账号
-#   DINGTALK_WEBHOOK / WECOM_WEBHOOK  通知机器人
-#   SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASSWORD/EMAIL_TO  邮件
-#   DB_USER/DB_PASSWORD/REDIS_PASSWORD  (如用到)
-# 这些变量会自动注入到各 job 的环境变量，无需在下面重复声明。
-# =====================================================================
-
 stages:
+  - quality
   - test
   - report
   - notify
 
 variables:
   ENV: "uat"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
-# ---------------- 接口测试 ----------------
-api-test:
-  stage: test
+.test-rules:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      variables:
+        TEST_MARKER: "regression"
+    - when: on_success
+      variables:
+        TEST_MARKER: "smoke"
+
+framework-test:
+  stage: quality
   image: python:3.12
   before_script:
-    - pip install -r requirements.txt
+    - pip install -r requirements-dev.txt
   script:
-    - pytest -m api --alluredir=reports/allure-results --junitxml=reports/junit-api.xml
+    - python -m ruff format --check .
+    - python -m ruff check .
+    - PYTEST_ADDOPTS="--alluredir=reports/allure-framework --clean-alluredir --junitxml=reports/junit-framework.xml" python scripts/automation.py self-test
   artifacts:
     when: always
     paths:
-      - reports/allure-results
+      - reports/allure-framework
+      - reports/junit-framework.xml
+    reports:
+      junit: reports/junit-framework.xml
+
+api-test:
+  extends: .test-rules
+  stage: test
+  image: python:3.12
+  needs: [framework-test]
+  before_script:
+    - pip install -r requirements-api.txt
+  script:
+    - PYTEST_ADDOPTS="--alluredir=reports/allure-api --clean-alluredir --junitxml=reports/junit-api.xml" python scripts/automation.py test --type api --env uat --marker "$TEST_MARKER"
+  artifacts:
+    when: always
+    paths:
+      - reports/allure-api
       - reports/junit-api.xml
     reports:
       junit: reports/junit-api.xml
 
-# ---------------- Web 测试(用 Playwright 官方镜像，自带浏览器) ----------------
 web-test:
+  extends: .test-rules
   stage: test
   image: mcr.microsoft.com/playwright/python:v1.49.1-jammy
+  needs: [framework-test]
   before_script:
-    - pip install -r requirements.txt
+    - pip install -r requirements-web.txt
   script:
-    - pytest -m web --alluredir=reports/allure-results --junitxml=reports/junit-web.xml
+    - PYTEST_ADDOPTS="--alluredir=reports/allure-web --clean-alluredir --junitxml=reports/junit-web.xml" python scripts/automation.py test --type web --env uat --marker "$TEST_MARKER"
   artifacts:
     when: always
     paths:
-      - reports/allure-results
+      - reports/allure-web
       - reports/junit-web.xml
     reports:
       junit: reports/junit-web.xml
 
-# ---------------- 生成 Allure 报告并发布到 GitLab Pages ----------------
 pages:
   stage: report
   image: eclipse-temurin:17-jre
   when: always
-  dependencies:
-    - api-test
-    - web-test
+  needs:
+    - job: framework-test
+      artifacts: true
+    - job: api-test
+      artifacts: true
+    - job: web-test
+      artifacts: true
   before_script:
     - apt-get update -qq && apt-get install -y -qq npm > /dev/null
     - npm install -g allure-commandline --silent
   script:
-    # GitLab Pages 固定发布 public/ 目录，访问地址见 $CI_PAGES_URL
+    - mkdir -p reports/allure-results
+    - cp -r reports/allure-framework/. reports/allure-results/ || true
+    - cp -r reports/allure-api/. reports/allure-results/ || true
+    - cp -r reports/allure-web/. reports/allure-results/ || true
     - allure generate reports/allure-results --clean -o public
   artifacts:
-    paths:
-      - public
+    paths: [public]
 
-# ---------------- 汇总结果并推送(钉钉/企微/邮件) ----------------
 notify:
   stage: notify
   image: python:3.12
   when: always
-  dependencies:
-    - api-test
-    - web-test
+  needs:
+    - job: framework-test
+      artifacts: true
+    - job: api-test
+      artifacts: true
+    - job: web-test
+      artifacts: true
   variables:
-    # GitLab 内置变量，Pages 报告地址；也可改成公司自建报告地址
     REPORT_URL: "$CI_PAGES_URL"
   before_script:
-    - pip install requests PyYAML python-dotenv loguru jsonpath-ng
+    - pip install -r requirements-api.txt
   script:
     - python scripts/notify_from_junit.py reports

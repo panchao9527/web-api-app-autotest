@@ -1,239 +1,112 @@
-# 全栈自动化测试框架 (API + Web + App)
+# API + Web + App 自动化测试框架
 
-基于 **Python + Pytest** 的统一自动化测试框架，三端共用核心层，一套工程同时管理 **接口测试、Web UI 测试、App 测试**。
+基于 Python 和 pytest 的三端自动化测试框架。保留简单的业务分层，同时内置离线自测、配置校验、敏感数据脱敏、生产环境保护、Allure 报告和三套 CI 配置。
 
----
+## 第一次使用
 
-## ✨ 特性
+Windows PowerShell：
 
-- **三端统一**：接口(requests) / Web(Playwright) / App(Appium) 共用配置、日志、报告
-- **分层架构**：核心层与业务层解耦，UI/接口改动只改一处
-- **PO 模式**：Web 用 Page Object，App 用 Screen Object，用例只写业务语义
-- **数据驱动**：yaml / json / excel 驱动，一套逻辑跑多组数据
-- **多环境**：sit / uat / prod 一键切换，敏感信息走 `.env`
-- **Allure 报告**：失败自动截图、请求/响应详情自动附加
-- **CI/CD**：GitHub Actions 自动跑 + 每日定时回归 + 报告发布
-- **失败重试**：过滤偶发抖动，提升稳定性
-
----
-
-## 📁 目录结构
-
-```
-.
-├── config/                  # 配置层
-│   ├── config.yaml          #   多环境(sit/uat/prod) + 三端配置
-│   └── settings.py          #   配置加载器(单例 settings)
-├── core/                    # 核心层(与业务无关，最稳定)
-│   ├── http_client.py       #   HTTP 客户端封装(自动日志/报告/打印返回)
-│   ├── assertions.py        #   自定义断言库(18个,含JSONPath/浮点近似/契约)
-│   ├── web_driver.py        #   Playwright 启动参数
-│   ├── app_driver.py        #   Appium driver 工厂
-│   └── network_recorder.py  #   UI流程抓接口序列
-├── api/                     # 接口业务层(按模块封装)
-│   ├── base_api.py
-│   ├── user_api.py
-│   └── sales_api.py
-├── pages/                   # Web 页面对象(PO 模式, BasePage 35方法)
-│   ├── base_page.py
-│   ├── login_page.py
-│   └── demo_search_page.py  #   可运行示例(百度搜索)
-├── screens/                 # App 页面对象(PO 模式, BaseScreen 21方法)
-│   ├── base_screen.py
-│   └── login_screen.py
-├── clients/                 # 测试基础设施客户端
-│   ├── db_client.py         #   MySQL 查库断言/数据准备清理
-│   ├── redis_client.py      #   Redis 缓存校验
-│   ├── notify.py            #   钉钉/企微 机器人通知
-│   └── email_client.py      #   邮件报告
-├── testcases/               # 测试用例(只写业务逻辑)
-│   ├── api/                 #   test_login_api / test_sales
-│   ├── web/                 #   test_login_web / test_demo_search
-│   └── app/                 #   test_login_app
-├── data/                    # 测试数据(数据驱动)
-│   ├── login_data.yaml
-│   └── sales/               #   sales_payload.py + 门店列表(*.txt.example)
-├── fixtures/                # 共享 fixture
-│   └── api_fixtures.py      #   登录态/共享client/db/created_user/clean_data
-├── utils/                   # 通用工具
-│   ├── logger.py            #   日志(loguru)
-│   ├── data_loader.py       #   数据加载(yaml/json/excel/txt)
-│   ├── random_data.py       #   随机数据 + uuid/唯一ID
-│   ├── date_util.py         #   日期时间
-│   ├── extractor.py         #   JSONPath 提取
-│   ├── crypto_util.py       #   加密/签名
-│   ├── retry.py             #   轮询/重试
-│   ├── file_util.py         #   文件读写
-│   ├── dict_util.py         #   字典深取/对比/子集
-│   └── schema_util.py       #   响应生成JSON Schema
-├── scripts/                 # 脚本
-│   └── notify_from_junit.py #   CI 汇总junit并推送通知
-├── docs/                    # 使用文档(11篇)
-├── .kiro/skills/            # AI Skill(录制→PO / 单接口 / 场景级 生成)
-├── conftest.py              # 全局 hook + fixture(失败自动截图/跑完自动通知)
-├── pytest.ini               # pytest 配置 + 用例标记
-├── requirements.txt          # 核心依赖(轻量)
-├── requirements-optional.txt # 可选依赖(ES/Kafka/MQ 等，用到再装)
-├── Makefile                 # 常用命令快捷方式
-├── .github/workflows/       # GitHub Actions CI
-├── .gitlab-ci.yml           # GitLab CI
-└── Jenkinsfile              # Jenkins 流水线
-
-# 以下为运行时自动生成、已在 .gitignore 排除(仓库里看不到，属正常)：
-#   reports/       Allure 报告输出(跑 pytest 后)
-#   logs/          运行日志
-#   screenshots/   UI 失败截图 / traces/ 回放
-#   .venv/         虚拟环境
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m playwright install chromium
+python scripts/automation.py doctor
+python scripts/automation.py self-test
 ```
 
----
+详细教程见：[新项目自动化测试：从 0 开始操作指南](docs/新项目从0开始.md)。
 
-## 🚀 快速开始
+## 统一命令
 
-### 1. 安装依赖
+```powershell
+# 检查环境
+python scripts/automation.py doctor --env uat
 
-```bash
-pip install -r requirements.txt
-playwright install chromium        # Web 测试需要
-# App 测试另需: 安装 Appium server + Android SDK / Xcode
-#   详细步骤见 docs/appium-setup.md
+# 只跑离线框架自测，不访问外部系统
+python scripts/automation.py self-test
+
+# 真实业务测试
+python scripts/automation.py test --type api --env uat
+python scripts/automation.py test --type web --env uat --headed
+python scripts/automation.py test --type app --env uat
+python scripts/automation.py test --type all --env uat --marker smoke
+
+# 清理报告和缓存
+python scripts/automation.py clean
 ```
 
-> 也可直接 `make install`
->
-> 💡 建议用虚拟环境隔离依赖，避免与本机其它包(如 httprunner)冲突：
-> ```bash
-> python -m venv .venv
-> source .venv/Scripts/activate    # Git Bash;  PowerShell 用 .venv\Scripts\activate
-> pip install -r requirements.txt
-> ```
+默认执行 `pytest` 只运行 `tests/framework/` 下的离线框架自测。真实项目用例必须放在 `testcases/`，并通过统一命令或显式目录运行。
 
-### 2. 配置环境
+## 目录
 
-```bash
-cp .env.example .env               # 填入真实账号/token
+```text
+api/                 API 业务封装
+pages/               Web Page Object
+screens/             App Screen Object
+testcases/           真实业务测试
+tests/framework/     框架自身离线测试
+examples/            外部站点和占位教学示例，默认不执行
+fixtures/            共享 fixture 和数据清理
+clients/             DB、Redis、通知和邮件客户端
+core/                HTTP、断言、Web/App driver 等核心能力
+config/              多环境配置
+data/                测试数据
+scripts/              统一命令和 CI 脚本
+docs/                 使用文档
 ```
 
-编辑 `config/config.yaml` 把 `example.com` 换成你的真实地址。
+## 依赖安装
 
-### 3. 运行用例
+```powershell
+# 只做 API
+python -m pip install -r requirements-api.txt
 
-```bash
-make test          # 全部用例
-make api           # 只跑接口
-make web           # 只跑 Web
-make smoke         # 只跑冒烟(P0核心链路)
-make parallel      # 4 进程并发加速
+# API + Web
+python -m pip install -r requirements-web.txt
+python -m playwright install chromium
 
-# 或直接用 pytest
-ENV=uat pytest -m api                     # 指定环境跑接口
-pytest -m "smoke and api"                 # 组合标记
-pytest testcases/api/test_login_api.py    # 跑单个文件
+# App
+python -m pip install -r requirements-app.txt
+
+# MySQL / Redis
+python -m pip install -r requirements-infra.txt
+
+# 一次安装全部
+python -m pip install -r requirements.txt
 ```
 
-### 4. 查看报告
+## 安全规则
 
-```bash
-make report        # 本地生成并打开 Allure 报告
-```
+- 请求日志和 Allure 中的密码、token、Authorization、Cookie、手机号等字段强制脱敏。
+- `prod` 默认禁止运行。
+- 生产测试必须同时使用 `--allow-prod` 和 `ALLOW_PROD_TESTS=1`。
+- 获得生产授权后仍只收集 `prod_safe` 用例。
+- 生产环境禁止使用数据创建、数据库写入和自动清理 fixture。
+- 全局失败重试已取消，避免真实缺陷被重试成绿色。
 
----
+## Marker
 
-## 🏷️ 用例标记(markers)
+| Marker | 用途 |
+|---|---|
+| `api` / `web` / `app` | 测试端类型 |
+| `smoke` | 每次提交执行的核心链路 |
+| `regression` | 定时完整回归 |
+| `p0` / `p1` / `p2` | 业务优先级 |
+| `prod_safe` | 人工审核后的生产只读用例 |
+| `flaky` | 已登记的不稳定用例，不代表默认重试 |
 
-| 标记 | 含义 | 示例 |
-|------|------|------|
-| `smoke` | 冒烟用例(P0核心链路) | `pytest -m smoke` |
-| `regression` | 回归用例 | `pytest -m regression` |
-| `api` / `web` / `app` | 按端筛选 | `pytest -m web` |
-| `p0` / `p1` / `p2` | 优先级 | `pytest -m p0` |
+## CI
 
----
+仓库提供 GitHub Actions、GitLab CI 和 Jenkins 配置。框架自测是业务测试的前置门禁；API 和 Web 使用独立 Allure 目录并行执行，结束后合并报告。详见 [CI/CD 集成](docs/ci.md)。
 
-## 🧩 如何新增用例
+## 其他文档
 
-> 📘 **小白手把手教程**（强烈推荐先看）：
-> - 接口测试：**[docs/api-guide.md](docs/api-guide.md)**
-> - Web 测试：**[docs/web-guide.md](docs/web-guide.md)**
-> - App 测试：**[docs/appium-setup.md](docs/appium-setup.md)**
-> - 基础设施客户端(DB/Redis/通知)：**[docs/infra-clients.md](docs/infra-clients.md)**
-> - 工具与 Fixture 速查：**[docs/utils-fixtures.md](docs/utils-fixtures.md)**
-> - 团队代码规范：**[docs/coding-standards.md](docs/coding-standards.md)**
-> - UI vs 接口 测试分工策略：**[docs/ui-api-strategy.md](docs/ui-api-strategy.md)**
-> - CI/CD 集成(GitHub/GitLab/Jenkins)：**[docs/ci.md](docs/ci.md)**
-> - 新公司落地指南(改哪里/要什么权限)：**[docs/onboarding.md](docs/onboarding.md)**
-
-### 新增接口测试
-1. 在 `api/` 下封装接口调用(继承 `BaseApi`)
-2. 在 `data/` 下准备数据(可选，数据驱动)
-3. 在 `testcases/api/` 下写用例，调用 api 方法 + `Assert` 断言
-
-### 新增 Web 测试
-1. 在 `pages/` 下新建页面对象(继承 `BasePage`)，定位器集中在类顶部
-2. 在 `testcases/web/` 下写用例，只调页面的业务方法
-
-### 新增 App 测试
-1. 在 `screens/` 下新建页面对象(继承 `BaseScreen`)
-2. 在 `testcases/app/` 下写用例，用 `app_driver` fixture
-
-> 📱 **App 自动化首次上手**：完整的 Appium 环境搭建、获取包名/Activity、用 Appium Inspector 抓元素定位、写 Screen 对象与用例的详细步骤，见 **[docs/appium-setup.md](docs/appium-setup.md)**。
-
-> **定位原则**：Web 优先 `data-testid`，App 优先 `resource-id`/`accessibility-id`，避免脆弱的绝对 xpath。
-
----
-
-## 🤖 结合 AI 工具写用例(提效)
-
-1. **用例设计**：把需求/接口文档丢给 AI，让它用等价类/边界值列出测试场景 → 填进 `data/*.yaml`
-2. **生成接口封装**：把 Swagger/OpenAPI 给 AI，自动生成 `api/` 下的封装类
-3. **重构录制脚本**：Playwright `codegen` 录制后，让 AI 重构成 PO 模式
-4. **造数据**：`utils/random_data.py` 已集成 Faker，配合 AI 设计数据规则
-
-> ⚠️ AI 生成的代码必须 review，框架原理要自己懂，否则会产出难维护的用例。
-
-### 🛠️ Skill：把"录制/定义"一键变成规范用例
-
-仓库内置了 Kiro Skill（`.kiro/skills/`），在 Kiro 里把素材交给 AI、说一句话即可按框架规范生成用例并提交：
-
-| Skill | 输入 | 产出 |
-|-------|------|------|
-| **recording-to-po** | codegen / Appium Inspector 录制的裸代码 | Web/App 的 `pages`或`screens` + 用例 |
-| **api-test-from-spec** | Swagger / Controller 代码 / 接口文档 | `api/` 封装 + 单接口用例(正常/必填/边界/异常) |
-| **api-scenario-test** | 业务流程描述 / 接口调用序列 | 接口场景级用例(共享登录态+传参+查库核对) |
-
-用法示例：
-> "用 api-scenario-test 写一条流程：登录 → 创建订单 → 支付 → 查订单=PAID → 查库核对"
-
-AI 会自动判断归属模块、按规范生成对应 `api/`、`testcases/`，校验语法后提交推送。详见各 skill 的 `SKILL.md`。
-
----
-
-## 🔧 后期维护建议
-
-| 方面 | 做法 |
-|------|------|
-| **降低脆弱** | 稳定定位器 + Playwright/显式等待，杜绝 `sleep` |
-| **失败治理** | 自动重试过滤抖动；区分真 bug 与用例问题；看 Allure 截图/trace |
-| **用例分级** | smoke(每次合并) / regression(每日) / 全量 |
-| **资产管理** | 定期清理重复无效用例，用例不是越多越好 |
-| **持续集成** | push/PR 跑冒烟，每日定时跑全量，失败自动通知 |
-| **监控指标** | 通过率、执行时长、缺陷拦截率、维护频率 |
-
----
-
-## 📊 CI/CD
-
-`.github/workflows/automation-test.yml` 已配置：
-- **触发**：push/PR 到 main、每日 02:00 定时、手动触发
-- **并行**：api-test 与 web-test 分 job 跑
-- **报告**：自动合并 Allure 结果并发布到 GitHub Pages
-- **密钥**：账号通过 GitHub Secrets(`TEST_USERNAME`/`TEST_PASSWORD`)注入
-
-> 在仓库 Settings → Secrets 配置账号；启用 Pages(Source 选 gh-pages 分支)查看报告。
-
----
-
-## 📝 说明
-
-示例用例中的 URL/接口路径/定位器均为占位符(`example.com` / `data-testid` 等)，
-替换成你项目的真实信息即可运行。App 用例默认 `@skip`，连接真机/模拟器并启动 Appium 后放开。
+- [API 测试指南](docs/api-guide.md)
+- [Web 测试指南](docs/web-guide.md)
+- [Appium 环境搭建](docs/appium-setup.md)
+- [基础设施客户端](docs/infra-clients.md)
+- [工具与 Fixture](docs/utils-fixtures.md)
+- [代码规范](docs/coding-standards.md)
+- [UI 与 API 分工策略](docs/ui-api-strategy.md)

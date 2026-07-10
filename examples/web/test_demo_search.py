@@ -5,6 +5,7 @@ UI 自动化 体验示例（百度搜索）
     playwright install chromium
     pytest testcases/web/test_demo_search.py --headed --slowmo 800 -s
 """
+
 import allure
 import pytest
 from playwright.sync_api import Page
@@ -16,7 +17,6 @@ from pages.demo_search_page import BaiduSearchPage
 @allure.feature("百度搜索")
 @pytest.mark.web
 class TestDemoSearch:
-
     @allure.story("搜索后出现结果")
     @pytest.mark.smoke
     def test_baidu_search(self, page: Page):

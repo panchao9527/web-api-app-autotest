@@ -2,6 +2,7 @@
 App 登录页对象 (示例)
 - 定位器集中管理，App 改版只改这里
 """
+
 import allure
 
 from screens.base_screen import BaseScreen

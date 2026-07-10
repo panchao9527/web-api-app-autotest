@@ -3,6 +3,7 @@ Appium 驱动工厂
 - 根据配置创建 Android / iOS driver
 - 统一管理 capabilities 与 server 地址
 """
+
 from appium import webdriver
 from appium.options.android import UiAutomator2Options
 from appium.options.ios import XCUITestOptions
@@ -28,5 +29,4 @@ def create_app_driver():
         raise ValueError(f"不支持的平台: {platform}")
 
     driver = webdriver.Remote(command_executor=server, options=options)
-    driver.implicitly_wait(settings.timeout)
     return driver

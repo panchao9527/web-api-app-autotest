@@ -4,6 +4,7 @@ Page Object 基类 (Playwright)
 - 子页面只声明定位器 + 业务方法，不重复写底层操作
 - 优先用 data-testid / role 等稳定定位；Playwright 自带智能等待，禁止写 sleep
 """
+
 import allure
 from playwright.sync_api import Page, expect
 
@@ -154,8 +155,7 @@ class BasePage:
     @allure.step("截图: {name}")
     def screenshot(self, name: str = "screenshot"):
         """手动截图并附加到 Allure(失败时框架已自动截图)"""
-        allure.attach(self.page.screenshot(), name=name,
-                      attachment_type=allure.attachment_type.PNG)
+        allure.attach(self.page.screenshot(), name=name, attachment_type=allure.attachment_type.PNG)
 
     # ================= 断言 (Playwright 自动等待) =================
     @allure.step("断言元素可见: {selector}")

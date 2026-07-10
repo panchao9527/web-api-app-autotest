@@ -116,14 +116,19 @@
 - commit message 用约定式前缀：
   - `feat:` 新功能　`fix:` 修复　`docs:` 文档　`test:` 用例　`refactor:` 重构　`chore:` 杂项
   - 示例：`test(web): 新增搜索页 PO 用例`
-- 提交前确保新增 `.py` 通过 `python -m py_compile` 语法校验。
+- 修改 `core/config/fixtures/utils/scripts` 时，先在 `tests/framework/` 写失败测试。
+- 提交前运行 `python -m ruff format .`、`python -m ruff check .` 和
+  `python scripts/automation.py self-test`。
 
 ---
 
 ## 11. 依赖管理
-- 核心、轻量依赖 → `requirements.txt`。
+- API 核心依赖 → `requirements-api.txt`。
+- Web/App/基础设施 → 对应的 `requirements-web/app/infra.txt`。
+- `requirements.txt` 是新手一次安装全部运行依赖的入口。
+- `requirements-dev.txt` 用于框架开发和质量检查。
 - 可选、较重依赖（中间件）→ `requirements-optional.txt`，注释状态，用到再开。
-- 建议用虚拟环境 `.venv` 隔离，避免与本机其它库冲突。
+- 必须用虚拟环境 `.venv` 隔离，避免与本机其它库冲突。
 
 ---
 

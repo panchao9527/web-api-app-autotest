@@ -3,12 +3,14 @@
 - 提供跨三端(API/Web/App)共享的 fixture 和 pytest hook
 - 失败时自动截图(Web/App) + 附加到 Allure 报告
 """
+
+import sys
+
 import allure
 import pytest
 
 from config.settings import settings
-from core.web_driver import browser_context_args as _web_context_args
-from core.web_driver import browser_launch_args as _web_launch_args
+from core.safety import ensure_environment_allowed
 from utils.logger import log
 
 # 注册 fixtures 包下的共享 fixture
@@ -20,11 +22,48 @@ pytest_plugins = [
 # ---------------------------------------------------------------------------
 # pytest hook
 # ---------------------------------------------------------------------------
+def pytest_addoption(parser):
+    group = parser.getgroup("automation", "自动化框架")
+    group.addoption("--env", action="store", default=None, help="运行环境，如 sit/uat/prod")
+    group.addoption(
+        "--allow-prod",
+        action="store_true",
+        default=False,
+        help="允许生产环境只读测试，仍需 ALLOW_PROD_TESTS=1",
+    )
+
+
 def pytest_configure(config):
     """运行开始前打印环境信息"""
+    selected_env = config.getoption("--env") or settings.env
+    if selected_env != settings.env:
+        settings.reload(selected_env)
+    ensure_environment_allowed(settings.env, config.getoption("--allow-prod"))
+    if hasattr(config.option, "browser"):
+        from core.web_driver import configured_browsers, configured_tracing
+
+        config.option.browser = configured_browsers(
+            config.getoption("--browser"), settings.web.get("browser", "chromium")
+        )
+        config.option.tracing = configured_tracing(
+            config.getoption("--tracing"),
+            sys.argv,
+            bool(settings.web.get("trace", False)),
+        )
     log.info("=" * 60)
     log.info(f"测试启动 | 环境: {settings.env} | base_url: {settings.api_base_url}")
     log.info("=" * 60)
+
+
+def pytest_collection_modifyitems(config, items):
+    """生产环境获得授权后，也只收集显式标记为 prod_safe 的用例。"""
+    if settings.env != "prod":
+        return
+    selected = [item for item in items if item.get_closest_marker("prod_safe")]
+    deselected = [item for item in items if item not in selected]
+    items[:] = selected
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -77,12 +116,16 @@ def env_settings():
 # ---------------------------------------------------------------------------
 @pytest.fixture(scope="session")
 def browser_type_launch_args(browser_type_launch_args):
-    return {**browser_type_launch_args, **_web_launch_args()}
+    from core.web_driver import browser_launch_args, merge_launch_args
+
+    return merge_launch_args(browser_launch_args(), browser_type_launch_args)
 
 
 @pytest.fixture
 def browser_context_args(browser_context_args):
-    return {**browser_context_args, **_web_context_args()}
+    from core.web_driver import browser_context_args as configured_context_args
+
+    return {**browser_context_args, **configured_context_args()}
 
 
 # ---------------------------------------------------------------------------
@@ -93,10 +136,13 @@ def app_driver():
     """App 测试用：创建 driver，用例结束自动退出"""
     from core.app_driver import create_app_driver
 
-    driver = create_app_driver()
-    yield driver
-    driver.quit()
-
+    driver = None
+    try:
+        driver = create_app_driver()
+        yield driver
+    finally:
+        if driver is not None:
+            driver.quit()
 
 
 @pytest.fixture
@@ -108,7 +154,6 @@ def network_recorder(page):
     from core.network_recorder import NetworkRecorder
 
     return NetworkRecorder(page)
-
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
@@ -136,15 +181,19 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
     try:
         from clients.notify import Notifier
-        Notifier().send_test_result(total=total, passed=passed, failed=failed,
-                                    duration=duration, report_url=report_url)
+
+        Notifier().send_test_result(
+            total=total, passed=passed, failed=failed, duration=duration, report_url=report_url
+        )
     except Exception as e:  # noqa
         log.warning(f"钉钉/企微通知失败: {e}")
 
     if settings.email.get("host") and settings.email.get("to"):
         try:
             from clients.email_client import EmailSender
-            EmailSender().send_report(total=total, passed=passed, failed=failed,
-                                      duration=duration, report_url=report_url)
+
+            EmailSender().send_report(
+                total=total, passed=passed, failed=failed, duration=duration, report_url=report_url
+            )
         except Exception as e:  # noqa
             log.warning(f"邮件通知失败: {e}")

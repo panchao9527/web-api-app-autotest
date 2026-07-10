@@ -1,31 +1,40 @@
-# 常用命令快捷方式，本地运行 `make <目标>`
+# 可选快捷方式；Windows 用户可直接运行右侧 Python 命令
 
-.PHONY: install test api web app smoke report clean
+.PHONY: install doctor self-test test api web app smoke regression parallel report clean
 
-install:        ## 安装依赖 + Playwright 浏览器
-	pip install -r requirements.txt
-	playwright install chromium
+install:
+	python -m pip install -r requirements.txt
+	python -m playwright install chromium
 
-test:           ## 跑全部用例
-	pytest
+doctor:
+	python scripts/automation.py doctor
 
-api:            ## 只跑接口测试
-	pytest -m api
+self-test:
+	python scripts/automation.py self-test
 
-web:            ## 只跑 Web 测试
-	pytest -m web
+test:
+	python scripts/automation.py test --type all
 
-app:            ## 只跑 App 测试
-	pytest -m app
+api:
+	python scripts/automation.py test --type api
 
-smoke:          ## 只跑冒烟用例(P0核心链路)
-	pytest -m smoke
+web:
+	python scripts/automation.py test --type web
 
-parallel:       ## 并发跑(4进程加速)
-	pytest -n 4
+app:
+	python scripts/automation.py test --type app
 
-report:         ## 本地生成并打开 Allure 报告
+smoke:
+	python scripts/automation.py test --type all --marker smoke
+
+regression:
+	python scripts/automation.py test --type all --marker regression
+
+parallel:
+	python -m pytest testcases -n 4
+
+report:
 	allure serve reports/allure-results
 
-clean:          ## 清理报告/日志/缓存
-	rm -rf reports/allure-results reports/allure-report logs .pytest_cache
+clean:
+	python scripts/automation.py clean

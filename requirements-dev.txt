@@ -1,0 +1,5 @@
+# 框架开发、静态检查和离线自测
+-r requirements-web.txt
+-r requirements-infra.txt
+ruff==0.9.10
+

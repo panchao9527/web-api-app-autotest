@@ -4,6 +4,7 @@ App 登录测试 (Appium + PO 模式 示例)
 - app_driver fixture 由 conftest 提供，失败自动截图
 - 默认 skip，去掉 skip 并准备好设备后即可运行
 """
+
 import allure
 import pytest
 
@@ -15,7 +16,6 @@ from screens.login_screen import LoginScreen
 @pytest.mark.app
 @pytest.mark.skip(reason="需连接真机/模拟器并启动 Appium server 后再放开")
 class TestLoginApp:
-
     @allure.story("App 登录成功")
     @pytest.mark.smoke
     @pytest.mark.p0

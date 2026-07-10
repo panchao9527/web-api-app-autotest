@@ -3,6 +3,7 @@
 - 原来 3 个近 2000 行、只差 ownership(M/L/J) 的方法 → 合并为 1 个数据驱动用例
 - 门店编码从 data/sales/*.txt 读取（真实文件不入库，见 *.txt.example）
 """
+
 import allure
 import pytest
 
@@ -38,7 +39,6 @@ _CASES = load_store_cases()
 @allure.feature("门店销售数据上送")
 @pytest.mark.api
 class TestSalesData:
-
     @allure.story("上送各类餐厅销售数据")
     @pytest.mark.skipif(
         not _CASES,

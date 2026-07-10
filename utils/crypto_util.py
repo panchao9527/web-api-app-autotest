@@ -5,6 +5,7 @@
     from utils.crypto_util import md5, sha256, hmac_sha256, base64_encode
     sign = md5("a=1&b=2&key=secret")
 """
+
 import base64
 import hashlib
 import hmac

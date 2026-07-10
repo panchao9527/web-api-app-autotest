@@ -7,6 +7,7 @@
     order_id = extract(resp.json(), "$.data.order_id")
     names    = extract_all(resp.json(), "$.data.list[*].name")
 """
+
 from jsonpath_ng.ext import parse
 
 from utils.logger import log

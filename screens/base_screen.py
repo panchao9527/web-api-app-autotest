@@ -4,6 +4,7 @@ App 页面对象基类 (Appium / 移动端 PO 模式)
 - 定位优先用 accessibility id / resource-id，避免脆弱定位
 - 显式等待已内置，禁止写 sleep
 """
+
 import allure
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.webdriver.support import expected_conditions as EC
@@ -66,26 +67,46 @@ class BaseScreen:
     @allure.step("上滑")
     def swipe_up(self, duration=800):
         s = self.driver.get_window_size()
-        self._swipe(s["width"] // 2, int(s["height"] * 0.8),
-                    s["width"] // 2, int(s["height"] * 0.2), duration)
+        self._swipe(
+            s["width"] // 2,
+            int(s["height"] * 0.8),
+            s["width"] // 2,
+            int(s["height"] * 0.2),
+            duration,
+        )
 
     @allure.step("下滑")
     def swipe_down(self, duration=800):
         s = self.driver.get_window_size()
-        self._swipe(s["width"] // 2, int(s["height"] * 0.2),
-                    s["width"] // 2, int(s["height"] * 0.8), duration)
+        self._swipe(
+            s["width"] // 2,
+            int(s["height"] * 0.2),
+            s["width"] // 2,
+            int(s["height"] * 0.8),
+            duration,
+        )
 
     @allure.step("左滑")
     def swipe_left(self, duration=800):
         s = self.driver.get_window_size()
-        self._swipe(int(s["width"] * 0.8), s["height"] // 2,
-                    int(s["width"] * 0.2), s["height"] // 2, duration)
+        self._swipe(
+            int(s["width"] * 0.8),
+            s["height"] // 2,
+            int(s["width"] * 0.2),
+            s["height"] // 2,
+            duration,
+        )
 
     @allure.step("右滑")
     def swipe_right(self, duration=800):
         s = self.driver.get_window_size()
-        self._swipe(int(s["width"] * 0.2), s["height"] // 2,
-                    int(s["width"] * 0.8), s["height"] // 2, duration)
+        self._swipe(
+            int(s["width"] * 0.2),
+            s["height"] // 2,
+            int(s["width"] * 0.8),
+            s["height"] // 2,
+            duration,
+        )
 
     def pull_to_refresh(self):
         """下拉刷新"""
@@ -121,9 +142,7 @@ class BaseScreen:
         """获取 Android Toast 文本(需 UiAutomator2)"""
         try:
             el = WebDriverWait(self.driver, 5).until(
-                EC.presence_of_element_located(
-                    (AppiumBy.XPATH, "//android.widget.Toast")
-                )
+                EC.presence_of_element_located((AppiumBy.XPATH, "//android.widget.Toast"))
             )
             return el.get_attribute("name") or el.text
         except Exception:  # noqa
@@ -148,8 +167,11 @@ class BaseScreen:
 
     @allure.step("截图: {name}")
     def screenshot(self, name: str = "screenshot"):
-        allure.attach(self.driver.get_screenshot_as_png(), name=name,
-                      attachment_type=allure.attachment_type.PNG)
+        allure.attach(
+            self.driver.get_screenshot_as_png(),
+            name=name,
+            attachment_type=allure.attachment_type.PNG,
+        )
 
     # 常用定位方式快捷别名
     ID = AppiumBy.ID

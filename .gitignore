@@ -8,6 +8,7 @@ env/
 
 # 测试报告 / 缓存
 .pytest_cache/
+.ruff_cache/
 reports/allure-results/
 reports/allure-report/
 reports/html/

@@ -3,6 +3,7 @@
 - 定位器集中在类顶部，UI 改版只改这里
 - 业务方法对外暴露语义化操作 (login)，用例无需关心元素
 """
+
 import allure
 
 from pages.base_page import BasePage

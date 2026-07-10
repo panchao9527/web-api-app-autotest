@@ -3,19 +3,17 @@
 - 把"接口调用细节"封装在这里，用例只关心业务语义
 - 接口路径变了只改这里一处，所有用例不受影响
 """
+
 import allure
 
 from api.base_api import BaseApi
 
 
 class UserApi(BaseApi):
-
     @allure.step("登录: {username}")
     def login(self, username: str, password: str):
         """登录并自动回填 token，实现登录态复用"""
-        resp = self.client.post(
-            "/api/login", json={"username": username, "password": password}
-        )
+        resp = self.client.post("/api/login", json={"username": username, "password": password})
         # 登录成功则把 token 写回 client，后续请求自动带上
         if resp.status_code == 200:
             token = resp.json().get("token")
