@@ -7,6 +7,7 @@ import allure
 import requests
 
 from config.settings import settings
+from core.safety import ensure_http_request_allowed
 from utils.logger import log
 from utils.redaction import redact, redact_text, redact_url
 
@@ -22,7 +23,6 @@ class HttpClient:
         self.base_url = (base_url or settings.api_base_url).rstrip("/")
         self.session = session or requests.Session()
         self.timeout = timeout if timeout is not None else settings.timeout
-        self.session.headers.update({"Content-Type": "application/json"})
         selected_token = token or settings.api_token
         if selected_token:
             self.set_token(selected_token)
@@ -44,6 +44,7 @@ class HttpClient:
 
     def request(self, method: str, path: str, **kwargs) -> requests.Response:
         url = self._build_url(path)
+        ensure_http_request_allowed(settings.env, method, url, self.base_url)
         kwargs.setdefault("timeout", self.timeout)
         safe_url = redact_url(url)
         safe_request = self._request_detail(method, url, kwargs)

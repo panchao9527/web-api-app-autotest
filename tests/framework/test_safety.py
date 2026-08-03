@@ -2,6 +2,7 @@ import pytest
 
 from core.safety import (
     ensure_environment_allowed,
+    ensure_http_request_allowed,
     ensure_write_allowed,
     is_production_authorized,
 )
@@ -41,3 +42,35 @@ def test_non_prod_environment_needs_no_authorization(monkeypatch):
 def test_write_helpers_are_forbidden_in_prod():
     with pytest.raises(pytest.UsageError, match="写操作"):
         ensure_write_allowed("prod", "clean_data")
+
+
+def test_prod_http_only_allows_read_requests_to_configured_origin():
+    ensure_http_request_allowed(
+        "prod",
+        "GET",
+        "https://api.example.com:443/users?page=1",
+        "https://api.example.com",
+    )
+
+    with pytest.raises(pytest.UsageError, match="只读"):
+        ensure_http_request_allowed(
+            "prod", "POST", "https://api.example.com/users", "https://api.example.com"
+        )
+
+    with pytest.raises(pytest.UsageError, match="跨域"):
+        ensure_http_request_allowed(
+            "prod", "GET", "https://other.example.com/users", "https://api.example.com"
+        )
+
+
+def test_direct_db_and_redis_writes_are_also_blocked_in_prod(monkeypatch):
+    from clients.db_client import DBClient
+    from clients.redis_client import RedisClient
+
+    monkeypatch.setattr("clients.db_client.settings.env", "prod")
+    monkeypatch.setattr("clients.redis_client.settings.env", "prod")
+
+    with pytest.raises(pytest.UsageError, match="写操作"):
+        DBClient.__new__(DBClient).execute("DELETE FROM users")
+    with pytest.raises(pytest.UsageError, match="写操作"):
+        RedisClient.__new__(RedisClient).set("key", "value")

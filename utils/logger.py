@@ -9,6 +9,8 @@ from pathlib import Path
 
 from loguru import logger
 
+from config.settings import settings
+
 ROOT_DIR = Path(__file__).parent.parent
 LOG_DIR = ROOT_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
@@ -19,7 +21,7 @@ logger.remove()
 # 控制台输出
 logger.add(
     sys.stderr,
-    level="INFO",
+    level=settings.log_level,
     format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | "
     "<cyan>{name}:{line}</cyan> | <level>{message}</level>",
 )
@@ -27,7 +29,7 @@ logger.add(
 # 文件输出：按天切分，保留 15 天，自动压缩
 logger.add(
     LOG_DIR / "test_{time:YYYY-MM-DD}.log",
-    level="DEBUG",
+    level=settings.log_level,
     rotation="00:00",
     retention="15 days",
     compression="zip",

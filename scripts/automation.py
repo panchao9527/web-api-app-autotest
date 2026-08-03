@@ -71,11 +71,13 @@ def run_pytest(arguments: list[str], child_env: dict[str, str] | None = None) ->
     ).returncode
 
 
-def normalize_pytest_exit_code(exit_code: int) -> int:
-    """业务目录尚无用例时视为模板初始状态，不让 CI 失败。"""
-    if exit_code == 5:
+def normalize_pytest_exit_code(exit_code: int, allow_empty: bool = False) -> int:
+    """无业务用例默认失败；仅初始化模板时允许显式放行。"""
+    if exit_code == 5 and allow_empty:
         print("[提醒] 当前范围没有业务用例；添加 test_*.py 后会自动执行。")
         return 0
+    if exit_code == 5:
+        print("[失败] 当前范围没有收集到业务用例；如处于模板初始化阶段可传 --allow-empty。")
     return exit_code
 
 
@@ -185,6 +187,19 @@ def _check_optional_tools() -> None:
     else:
         _print_check("提醒", "未找到 Appium Server；仅做 API/Web 测试可忽略")
 
+    platform = Settings(config_file=CONFIG_FILE).app.get("platform", "Android").lower()
+    if platform == "android":
+        if shutil.which("adb"):
+            _print_check("通过", "已找到 Android adb 命令")
+        else:
+            _print_check("提醒", "未找到 adb；运行 Android App 测试前请安装 Android SDK")
+        if shutil.which("java"):
+            _print_check("通过", "已找到 Java 命令")
+        else:
+            _print_check("提醒", "未找到 Java；Appium Android 驱动通常需要 JDK")
+    elif sys.platform != "darwin":
+        _print_check("提醒", "iOS 真机/模拟器自动化需要在 macOS + Xcode 环境运行")
+
 
 def doctor(environment: str) -> int:
     print("自动化测试框架环境检查")
@@ -225,6 +240,11 @@ def create_parser() -> argparse.ArgumentParser:
     test_parser.add_argument("--slowmo", type=int, default=0)
     test_parser.add_argument("--tracing", choices=["on", "off", "retain-on-failure"])
     test_parser.add_argument("--allow-prod", action="store_true")
+    test_parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="模板初始化阶段允许没有业务用例；CI 不应使用",
+    )
     return parser
 
 
@@ -252,7 +272,7 @@ def main(argv: list[str] | None = None) -> int:
         tracing=args.tracing,
         allow_prod=args.allow_prod,
     )
-    return normalize_pytest_exit_code(run_pytest(command, child_env))
+    return normalize_pytest_exit_code(run_pytest(command, child_env), allow_empty=args.allow_empty)
 
 
 if __name__ == "__main__":

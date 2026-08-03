@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta
 
+import pytest
 import requests
 
 from core.http_client import HttpClient
@@ -88,3 +89,16 @@ def test_request_exception_is_attached_and_reraised(monkeypatch):
 
     assert attached
     assert "query-secret" not in attached[0]
+
+
+def test_prod_client_blocks_write_and_cross_origin_requests(monkeypatch):
+    monkeypatch.setattr("core.http_client.settings.env", "prod")
+    session = FakeSession()
+    client = HttpClient(base_url="https://api.example.com", session=session)
+
+    with pytest.raises(pytest.UsageError, match="只读"):
+        client.post("/users", json={"name": "tester"})
+    with pytest.raises(pytest.UsageError, match="跨域"):
+        client.get("https://other.example.com/users")
+
+    assert session.calls == []

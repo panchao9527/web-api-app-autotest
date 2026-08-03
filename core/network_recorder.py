@@ -13,6 +13,18 @@
 import json
 
 from utils.logger import log
+from utils.redaction import redact, redact_text, redact_url
+
+
+def _safe_body(body):
+    """优先按 JSON 脱敏，非 JSON 文本使用通用键值脱敏。"""
+    if body is None:
+        return None
+    try:
+        parsed = json.loads(body)
+    except (TypeError, ValueError):
+        return redact_text(str(body))
+    return json.dumps(redact(parsed), ensure_ascii=False)
 
 
 class NetworkRecorder:
@@ -35,13 +47,13 @@ class NetworkRecorder:
                 return
             record = {
                 "method": req.method,
-                "url": req.url,
+                "url": redact_url(req.url),
                 "status": response.status,
-                "request_body": req.post_data,
+                "request_body": _safe_body(req.post_data),
             }
             if self.capture_body:
                 try:
-                    record["response_body"] = response.text()[:1000]
+                    record["response_body"] = _safe_body(response.text())[:1000]
                 except Exception:  # noqa
                     record["response_body"] = None
             self.calls.append(record)

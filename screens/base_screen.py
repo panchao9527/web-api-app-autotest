@@ -12,6 +12,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from config.settings import settings
 from utils.logger import log
+from utils.redaction import safe_input_value
 
 
 class BaseScreen:
@@ -36,9 +37,10 @@ class BaseScreen:
         log.info(f"点击控件: {value}")
         self.find(by, value).click()
 
-    @allure.step("输入 [{text}]: {value}")
-    def input(self, by, value, text):
-        log.info(f"输入: {value} <- {text}")
+    @allure.step("输入内容到: {value}")
+    def input(self, by, value, text, sensitive: bool = False):
+        safe_text = safe_input_value(text, value, sensitive)
+        log.info(f"输入: {value} <- {safe_text}")
         el = self.find(by, value)
         el.clear()
         el.send_keys(text)

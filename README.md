@@ -33,11 +33,14 @@ python scripts/automation.py test --type web --env uat --headed
 python scripts/automation.py test --type app --env uat
 python scripts/automation.py test --type all --env uat --marker smoke
 
+# 仅在刚初始化、业务目录尚无用例时显式放行；正式 CI 不要使用
+python scripts/automation.py test --type api --env uat --allow-empty
+
 # 清理报告和缓存
 python scripts/automation.py clean
 ```
 
-默认执行 `pytest` 只运行 `tests/framework/` 下的离线框架自测。真实项目用例必须放在 `testcases/`，并通过统一命令或显式目录运行。
+默认执行 `pytest` 只运行 `tests/framework/` 下的离线框架自测。真实项目用例必须放在 `testcases/`，并通过统一命令或显式目录运行。业务测试没有收集到任何用例时默认失败，防止路径或 marker 写错后 CI 仍显示绿色；只有模板初始化阶段才使用 `--allow-empty`。
 
 ## 目录
 
@@ -79,11 +82,12 @@ python -m pip install -r requirements.txt
 
 ## 安全规则
 
-- 请求日志和 Allure 中的密码、token、Authorization、Cookie、手机号等字段强制脱敏。
+- API、Web、App、网络录制和基础设施日志中的密码、token、Authorization、Cookie、手机号等字段强制脱敏。
 - `prod` 默认禁止运行。
 - 生产测试必须同时使用 `--allow-prod` 和 `ALLOW_PROD_TESTS=1`。
 - 获得生产授权后仍只收集 `prod_safe` 用例。
-- 生产环境禁止使用数据创建、数据库写入和自动清理 fixture。
+- 生产环境 HTTP 仅允许访问配置的同源 API，并只允许 GET/HEAD/OPTIONS。
+- 生产环境禁止数据库和 Redis 写入；保护同时作用于 fixture 和直接客户端调用。
 - 全局失败重试已取消，避免真实缺陷被重试成绿色。
 
 ## Marker

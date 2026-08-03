@@ -23,7 +23,7 @@ class LoginPage(BasePage):
         """业务方法：完整登录流程"""
         self.open(self.URL)
         self.fill(self.INPUT_USERNAME, username)
-        self.fill(self.INPUT_PASSWORD, password)
+        self.fill(self.INPUT_PASSWORD, password, sensitive=True)
         self.click(self.BTN_SUBMIT)
 
     def get_error_message(self) -> str:

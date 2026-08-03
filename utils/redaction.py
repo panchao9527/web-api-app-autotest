@@ -19,12 +19,27 @@ SENSITIVE_KEYS = frozenset(
         "mobile",
         "phone",
         "id_card",
+        "passcode",
+        "otp",
     }
 )
 
 
 def _normalized_keys(sensitive_keys) -> frozenset[str]:
     return frozenset(str(key).lower() for key in sensitive_keys)
+
+
+def is_sensitive_field(field: str, sensitive_keys=SENSITIVE_KEYS) -> bool:
+    """根据字段名、定位器或标签判断输入内容是否应隐藏。"""
+    normalized = re.sub(r"[^a-z0-9]+", "_", str(field).lower())
+    return any(key in normalized for key in _normalized_keys(sensitive_keys))
+
+
+def safe_input_value(value, field: str = "", sensitive: bool = False) -> str:
+    """返回可安全写入日志的输入值，不改变真正发送给页面或设备的值。"""
+    if sensitive or is_sensitive_field(field):
+        return MASK
+    return redact_text(str(value))
 
 
 def redact(value, sensitive_keys=SENSITIVE_KEYS):

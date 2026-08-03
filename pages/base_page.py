@@ -10,6 +10,7 @@ from playwright.sync_api import Page, expect
 
 from config.settings import settings
 from utils.logger import log
+from utils.redaction import safe_input_value
 
 
 class BasePage:
@@ -64,14 +65,17 @@ class BasePage:
         log.info(f"按文本点击: {text}")
         self.page.get_by_text(text, exact=exact).first.click()
 
-    @allure.step("输入 [{text}] 到 {selector}")
-    def fill(self, selector: str, text: str):
-        log.info(f"输入: {selector} <- {text}")
+    @allure.step("输入内容到 {selector}")
+    def fill(self, selector: str, text: str, sensitive: bool = False):
+        safe_text = safe_input_value(text, selector, sensitive)
+        log.info(f"输入: {selector} <- {safe_text}")
         self.page.fill(selector, text)
 
-    @allure.step("逐字输入 [{text}] 到 {selector}")
-    def type_text(self, selector: str, text: str, delay: int = 50):
+    @allure.step("逐字输入内容到 {selector}")
+    def type_text(self, selector: str, text: str, delay: int = 50, sensitive: bool = False):
         """模拟逐字输入(触发联想/校验等场景)"""
+        safe_text = safe_input_value(text, selector, sensitive)
+        log.info(f"逐字输入: {selector} <- {safe_text}")
         self.page.type(selector, text, delay=delay)
 
     @allure.step("清空: {selector}")

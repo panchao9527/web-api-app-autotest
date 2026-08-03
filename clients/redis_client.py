@@ -13,7 +13,13 @@ Redis 客户端（验证缓存 / 清理测试数据）
 """
 
 from config.settings import settings
+from core.safety import ensure_write_allowed
 from utils.logger import log
+from utils.redaction import safe_input_value
+
+
+def _safe_key(key: str) -> str:
+    return safe_input_value(key, key)
 
 
 class RedisClient:
@@ -36,26 +42,31 @@ class RedisClient:
 
     def get(self, key: str):
         val = self.client.get(key)
-        log.info(f"Redis GET {key} -> {val}")
+        log.info(f"Redis GET {_safe_key(key)} -> {'命中' if val is not None else '未命中'}")
         return val
 
     def set(self, key: str, value, ex: int = None):
         """ex: 过期秒数"""
-        log.info(f"Redis SET {key}={value} ex={ex}")
+        ensure_write_allowed(settings.env, "RedisClient.set")
+        log.info(f"Redis SET {_safe_key(key)} ex={ex}（值不写入日志）")
         return self.client.set(key, value, ex=ex)
 
     def delete(self, *keys):
-        log.info(f"Redis DEL {keys}")
+        ensure_write_allowed(settings.env, "RedisClient.delete")
+        safe_keys = tuple(_safe_key(key) for key in keys)
+        log.info(f"Redis DEL {safe_keys}")
         return self.client.delete(*keys)
 
     def exists(self, key: str) -> bool:
         return bool(self.client.exists(key))
 
     def expire(self, key: str, seconds: int):
+        ensure_write_allowed(settings.env, "RedisClient.expire")
         return self.client.expire(key, seconds)
 
     def keys(self, pattern: str = "*") -> list:
-        return self.client.keys(pattern)
+        """使用渐进式 SCAN，避免 KEYS 阻塞 Redis。"""
+        return list(self.client.scan_iter(match=pattern, count=100))
 
     def hgetall(self, key: str) -> dict:
         return self.client.hgetall(key)

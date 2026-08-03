@@ -43,8 +43,9 @@ def test_build_api_command_keeps_marker_optional():
     assert "--headed" not in command
 
 
-def test_no_business_tests_is_a_non_failing_template_state():
-    assert normalize_pytest_exit_code(5) == 0
+def test_no_business_tests_fail_by_default_and_can_be_explicitly_allowed():
+    assert normalize_pytest_exit_code(5) == 5
+    assert normalize_pytest_exit_code(5, allow_empty=True) == 0
     assert normalize_pytest_exit_code(1) == 1
 
 

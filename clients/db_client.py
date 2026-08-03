@@ -14,7 +14,14 @@ MySQL 数据库客户端（数据校验/数据准备用）
 """
 
 from config.settings import settings
+from core.safety import ensure_write_allowed
 from utils.logger import log
+from utils.redaction import redact_text
+
+
+def _safe_sql_log(sql: str, args) -> str:
+    count = len(args) if isinstance(args, list | tuple | dict) else int(args is not None)
+    return f"{redact_text(sql)} | 参数个数: {count}"
 
 
 class DBClient:
@@ -42,7 +49,7 @@ class DBClient:
     # ---- 查询 ----
     def query(self, sql: str, args=None) -> list[dict]:
         """查询多行，返回 [{列: 值}, ...]"""
-        log.info(f"SQL查询: {sql} | 参数: {args}")
+        log.info(f"SQL查询: {_safe_sql_log(sql, args)}")
         with self.conn.cursor() as cur:
             cur.execute(sql, args)
             rows = cur.fetchall()
@@ -51,7 +58,7 @@ class DBClient:
 
     def query_one(self, sql: str, args=None) -> dict | None:
         """查询单行，返回 {列: 值} 或 None"""
-        log.info(f"SQL查询(单行): {sql} | 参数: {args}")
+        log.info(f"SQL查询(单行): {_safe_sql_log(sql, args)}")
         with self.conn.cursor() as cur:
             cur.execute(sql, args)
             return cur.fetchone()
@@ -59,7 +66,8 @@ class DBClient:
     # ---- 写入 ----
     def execute(self, sql: str, args=None) -> int:
         """执行 insert/update/delete，返回受影响行数（自动提交）"""
-        log.info(f"SQL执行: {sql} | 参数: {args}")
+        ensure_write_allowed(settings.env, "DBClient.execute")
+        log.info(f"SQL执行: {_safe_sql_log(sql, args)}")
         with self.conn.cursor() as cur:
             affected = cur.execute(sql, args)
         self.conn.commit()

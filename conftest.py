@@ -1,9 +1,10 @@
 """
 全局 conftest.py
 - 提供跨三端(API/Web/App)共享的 fixture 和 pytest hook
-- 失败时自动截图(Web/App) + 附加到 Allure 报告
+- setup/call/teardown 失败时自动保留 Web/App 截图和安全上下文
 """
 
+import json
 import sys
 
 import allure
@@ -12,6 +13,7 @@ import pytest
 from config.settings import settings
 from core.safety import ensure_environment_allowed
 from utils.logger import log
+from utils.redaction import redact, redact_text, redact_url
 
 # 注册 fixtures 包下的共享 fixture
 pytest_plugins = [
@@ -75,30 +77,57 @@ def pytest_runtest_makereport(item, call):
     outcome = yield
     report = outcome.get_result()
 
-    if report.when == "call" and report.failed:
-        # Web (Playwright)
-        page = item.funcargs.get("page", None)
-        if page is not None:
-            try:
-                allure.attach(
-                    page.screenshot(),
-                    name="失败截图",
-                    attachment_type=allure.attachment_type.PNG,
-                )
-            except Exception as e:  # noqa
-                log.warning(f"Web 截图失败: {e}")
+    if report.failed:
+        _attach_failure_evidence(item, report.when)
 
-        # App (Appium)
-        driver = item.funcargs.get("app_driver", None)
-        if driver is not None:
-            try:
-                allure.attach(
-                    driver.get_screenshot_as_png(),
-                    name="失败截图",
-                    attachment_type=allure.attachment_type.PNG,
-                )
-            except Exception as e:  # noqa
-                log.warning(f"App 截图失败: {e}")
+
+def _attach_json(data: dict, name: str) -> None:
+    allure.attach(
+        json.dumps(redact(data), ensure_ascii=False, indent=2),
+        name=name,
+        attachment_type=allure.attachment_type.JSON,
+    )
+
+
+def _attach_failure_evidence(item, stage: str) -> None:
+    """为 setup/call/teardown 任一阶段的失败尽量保留现场。"""
+    page = item.funcargs.get("page")
+    if page is not None:
+        try:
+            allure.attach(
+                page.screenshot(),
+                name=f"Web失败截图-{stage}",
+                attachment_type=allure.attachment_type.PNG,
+            )
+            _attach_json(
+                {
+                    "stage": stage,
+                    "url": redact_url(page.url),
+                    "title": redact_text(page.title()),
+                },
+                f"Web失败上下文-{stage}",
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning(f"Web 失败证据收集失败: {redact_text(str(exc))}")
+
+    driver = item.funcargs.get("app_driver")
+    if driver is not None:
+        try:
+            allure.attach(
+                driver.get_screenshot_as_png(),
+                name=f"App失败截图-{stage}",
+                attachment_type=allure.attachment_type.PNG,
+            )
+            _attach_json(
+                {
+                    "stage": stage,
+                    "package": getattr(driver, "current_package", ""),
+                    "activity": getattr(driver, "current_activity", ""),
+                },
+                f"App失败上下文-{stage}",
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning(f"App 失败证据收集失败: {redact_text(str(exc))}")
 
 
 # ---------------------------------------------------------------------------

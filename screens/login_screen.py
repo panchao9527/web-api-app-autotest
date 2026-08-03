@@ -19,7 +19,7 @@ class LoginScreen(BaseScreen):
     @allure.step("App 登录: {username}")
     def login(self, username: str, password: str):
         self.input(*self.INPUT_USERNAME, username)
-        self.input(*self.INPUT_PASSWORD, password)
+        self.input(*self.INPUT_PASSWORD, password, sensitive=True)
         self.click(*self.BTN_LOGIN)
 
     def get_error(self) -> str:
