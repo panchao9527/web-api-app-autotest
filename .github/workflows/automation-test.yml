@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: pip install -r requirements-dev.txt
+      - run: pip install -r requirements.txt
       - name: 静态检查
         if: matrix.python-version == '3.12'
         run: |
@@ -61,7 +61,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements-api.txt
+      - run: pip install -r requirements.txt
       - name: 运行 API 测试
         env:
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
@@ -90,7 +90,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements-web.txt
+      - run: pip install -r requirements.txt
       - run: playwright install --with-deps chromium
       - name: 运行 Web 测试
         env:
@@ -140,7 +140,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r requirements-api.txt
+      - run: pip install -r requirements.txt
       - uses: actions/download-artifact@v4
         with:
           pattern: junit-*

@@ -21,7 +21,7 @@ framework-test:
   stage: quality
   image: python:3.12
   before_script:
-    - pip install -r requirements-dev.txt
+    - pip install -r requirements.txt
   script:
     - python -m ruff format --check .
     - python -m ruff check .
@@ -40,7 +40,7 @@ api-test:
   image: python:3.12
   needs: [framework-test]
   before_script:
-    - pip install -r requirements-api.txt
+    - pip install -r requirements.txt
   script:
     - PYTEST_ADDOPTS="--alluredir=reports/allure-api --clean-alluredir --junitxml=reports/junit-api.xml" python scripts/automation.py test --type api --env uat --marker "$TEST_MARKER"
   artifacts:
@@ -57,7 +57,7 @@ web-test:
   image: mcr.microsoft.com/playwright/python:v1.49.1-jammy
   needs: [framework-test]
   before_script:
-    - pip install -r requirements-web.txt
+    - pip install -r requirements.txt
   script:
     - PYTEST_ADDOPTS="--alluredir=reports/allure-web --clean-alluredir --junitxml=reports/junit-web.xml" python scripts/automation.py test --type web --env uat --marker "$TEST_MARKER"
   artifacts:
@@ -105,6 +105,6 @@ notify:
   variables:
     REPORT_URL: "$CI_PAGES_URL"
   before_script:
-    - pip install -r requirements-api.txt
+    - pip install -r requirements.txt
   script:
     - python scripts/notify_from_junit.py reports

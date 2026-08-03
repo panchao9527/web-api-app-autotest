@@ -67,4 +67,4 @@ def test_order_e2e(self, api_client, env_settings):
 - 查库 `clients/db_client.py` `DBClient`
 - 断言 `core/assertions.py` `Assert`
 - fixture：`env_settings`、`logged_in_client`
-- 详见 `docs/api-guide.md`
+- 详见 `docs/自动化测试框架操作手册.md` 的“API 自动化操作步骤”章节

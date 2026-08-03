@@ -1,4 +1,36 @@
-# 新手一次安装全部运行依赖
--r requirements-web.txt
--r requirements-app.txt
--r requirements-infra.txt
+# API + Web + App 自动化统一依赖
+# 安装：python -m pip install -r requirements.txt
+
+# 测试框架、并发、失败重跑与报告
+pytest==8.3.4
+pytest-xdist==3.6.1
+pytest-rerunfailures==15.0
+allure-pytest==2.13.5
+
+# API、数据、断言与日志
+requests==2.32.3
+jsonschema==4.23.0
+PyYAML==6.0.2
+openpyxl==3.1.5
+Faker==33.1.0
+python-dotenv==1.0.1
+loguru==0.7.3
+jsonpath-ng==1.7.0
+
+# Web 自动化
+playwright==1.49.1
+pytest-playwright==0.6.2
+
+# App 自动化
+Appium-Python-Client==4.5.1
+selenium==4.27.1
+
+# MySQL / Redis 数据校验与清理
+PyMySQL==1.1.1
+redis==5.2.1
+
+# 框架代码质量检查
+ruff==0.9.10
+
+# 以后确实用到其它中间件时，再在本文件追加并锁定版本：
+# elasticsearch / kafka-python / pika / pymongo / psycopg2-binary

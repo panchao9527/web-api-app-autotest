@@ -1,5 +1,0 @@
-# App 测试；自动包含 API/核心依赖
--r requirements-api.txt
-Appium-Python-Client==4.5.1
-selenium==4.27.1
-

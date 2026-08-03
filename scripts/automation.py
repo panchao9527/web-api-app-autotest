@@ -117,7 +117,7 @@ def _check_imports() -> bool:
     ]
     if missing:
         _print_check(
-            "失败", f"缺少核心依赖: {', '.join(missing)}。运行 pip install -r requirements-api.txt"
+            "失败", f"缺少核心依赖: {', '.join(missing)}。运行 pip install -r requirements.txt"
         )
         return False
     _print_check("通过", "核心 Python 依赖已安装")
@@ -176,12 +176,12 @@ def _check_optional_tools() -> None:
         else:
             _print_check("提醒", "未发现 Chromium 缓存。运行 playwright install chromium")
     else:
-        _print_check("提醒", "未安装 Web 测试依赖。运行 pip install -r requirements-web.txt")
+        _print_check("提醒", "未安装 Web 测试依赖。运行 pip install -r requirements.txt")
 
     if importlib.util.find_spec("appium"):
         _print_check("通过", "Appium Python 客户端已安装")
     else:
-        _print_check("提醒", "未安装 App 测试依赖。运行 pip install -r requirements-app.txt")
+        _print_check("提醒", "未安装 App 测试依赖。运行 pip install -r requirements.txt")
     if shutil.which("appium"):
         _print_check("通过", "已找到 Appium Server 命令")
     else:

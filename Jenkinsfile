@@ -13,7 +13,7 @@ pipeline {
     stages {
         stage('安装依赖') {
             steps {
-                sh 'python3 -m pip install -r requirements.txt -r requirements-dev.txt'
+                sh 'python3 -m pip install -r requirements.txt'
             }
         }
 
