@@ -20,6 +20,14 @@ pytest_plugins = [
     "fixtures.api_fixtures",
 ]
 
+# 不同测试端的合理耗时差异较大。这里统一设置测试级超时，防止接口、
+# 浏览器或设备异常后无限等待；用例上的显式 timeout 标记始终优先。
+DEFAULT_TIMEOUTS_BY_MARKER = {
+    "api": 60,
+    "web": 180,
+    "app": 300,
+}
+
 
 # ---------------------------------------------------------------------------
 # pytest hook
@@ -58,7 +66,9 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    """生产环境获得授权后，也只收集显式标记为 prod_safe 的用例。"""
+    """应用三端默认超时，并在生产环境只保留 prod_safe 用例。"""
+    _apply_default_timeouts(items)
+
     if settings.env != "prod":
         return
     selected = [item for item in items if item.get_closest_marker("prod_safe")]
@@ -66,6 +76,21 @@ def pytest_collection_modifyitems(config, items):
     items[:] = selected
     if deselected:
         config.hook.pytest_deselected(items=deselected)
+
+
+def _apply_default_timeouts(items) -> None:
+    """按端类型设置超时；显式覆盖优先，多端标记取最长时间。"""
+    for item in items:
+        if item.get_closest_marker("timeout") is not None:
+            continue
+
+        matched_timeouts = [
+            seconds
+            for marker, seconds in DEFAULT_TIMEOUTS_BY_MARKER.items()
+            if item.get_closest_marker(marker) is not None
+        ]
+        if matched_timeouts:
+            item.add_marker(pytest.mark.timeout(max(matched_timeouts)))
 
 
 @pytest.hookimpl(hookwrapper=True)

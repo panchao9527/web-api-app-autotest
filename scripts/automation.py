@@ -107,6 +107,7 @@ def _check_virtual_environment() -> None:
 def _check_imports() -> bool:
     required = {
         "pytest": "pytest",
+        "pytest_timeout": "pytest-timeout",
         "requests": "requests",
         "yaml": "PyYAML",
         "dotenv": "python-dotenv",
