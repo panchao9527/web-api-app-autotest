@@ -18,7 +18,7 @@ description: 根据接口定义(Swagger/OpenAPI、Controller 代码、接口文�
 - 一个业务模块一个文件；方法名表达业务语义
 - 路径用相对路径（base_url 由 config 拼接）
 - 每个方法加 `@allure.step(...)`
-- 参考已有 `api/user_api.py`、`api/sales_api.py`
+- 参考已有 `api/user_api.py`
 
 ## 第 2 步：生成单接口用例 `testcases/api/<module>/test_<feature>.py`
 按字段类型自动设计场景，**覆盖以下维度**：
