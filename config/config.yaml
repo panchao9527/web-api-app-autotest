@@ -16,6 +16,8 @@ common:
 sit:
   api_base_url: "https://sit-api.example.com"
   web_base_url: "https://sit.example.com"
+  boss:
+    storage_state: ".auth/boss-sit.json"
   db:
     host: "sit-db.example.com"
     port: 3306
@@ -27,7 +29,9 @@ sit:
 
 uat:
   api_base_url: "https://uat-api.example.com"
-  web_base_url: "https://uat.example.com"
+  web_base_url: "https://boss.uat.mcdonalds.cn"
+  boss:
+    storage_state: ".auth/boss-uat.json"
   db:
     host: "uat-db.example.com"
     port: 3306
@@ -40,6 +44,8 @@ uat:
 prod:
   api_base_url: "https://api.example.com"
   web_base_url: "https://www.example.com"
+  boss:
+    storage_state: ".auth/boss-prod.json"
   db:
     host: "prod-db.example.com"
     port: 3306

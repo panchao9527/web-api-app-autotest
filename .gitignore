@@ -12,6 +12,7 @@ env/
 reports/allure-results/
 reports/allure-report/
 reports/html/
+test-results/
 *.log
 logs/
 
@@ -21,6 +22,7 @@ traces/
 
 # 敏感信息
 .env
+.auth/
 
 # IDE
 .idea/

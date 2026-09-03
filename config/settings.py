@@ -52,6 +52,12 @@ class Settings:
         self._env_cfg = dict(raw[self.env])
         self.api_base_url = _require_http_url("api_base_url", self._env_cfg.get("api_base_url", ""))
         self.web_base_url = _require_http_url("web_base_url", self._env_cfg.get("web_base_url", ""))
+        self.boss = dict(self._env_cfg.get("boss", {}))
+        self.boss["storage_state"] = (
+            os.getenv("BOSS_STORAGE_STATE")
+            or self.boss.get("storage_state")
+            or f".auth/boss-{self.env}.json"
+        )
 
         timeout = self.common.get("timeout", 30)
         if not isinstance(timeout, int | float) or isinstance(timeout, bool) or timeout <= 0:
