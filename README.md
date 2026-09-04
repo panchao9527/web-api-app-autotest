@@ -26,6 +26,14 @@ python scripts/automation.py doctor --env uat
 python scripts/automation.py self-test
 ```
 
+首次在 Windows 配置 Android 模拟器和 Appium：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_android_emulator.ps1
+python scripts/automation.py doctor --env uat --type app
+python scripts/automation.py app-smoke --env uat
+```
+
 运行三端业务测试：
 
 ```powershell
