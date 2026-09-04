@@ -4,7 +4,8 @@ from pathlib import Path
 from time import monotonic
 
 import allure
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import expect
 
 from pages.base_page import BasePage
 

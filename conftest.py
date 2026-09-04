@@ -185,9 +185,22 @@ def browser_context_args(browser_context_args):
 # ---------------------------------------------------------------------------
 # App (Appium) driver fixture
 # ---------------------------------------------------------------------------
+@pytest.fixture(scope="session")
+def appium_service():
+    """按配置自动管理本机 Appium Server；已有 Server 不会被关闭。"""
+    from core.app_driver import start_managed_appium_service
+
+    service = start_managed_appium_service()
+    try:
+        yield service
+    finally:
+        if service is not None:
+            service.stop()
+
+
 @pytest.fixture
-def app_driver():
-    """App 测试用：创建 driver，用例结束自动退出"""
+def app_driver(appium_service):
+    """App 测试用：确保 Server 就绪，创建 driver，并在用例结束后退出。"""
     from core.app_driver import create_app_driver
 
     driver = None

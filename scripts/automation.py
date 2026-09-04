@@ -202,13 +202,148 @@ def _check_optional_tools() -> None:
         _print_check("提醒", "iOS 真机/模拟器自动化需要在 macOS + Xcode 环境运行")
 
 
-def doctor(environment: str) -> int:
+def _command_output(executable: str, *arguments: str) -> tuple[int, str]:
+    """执行环境诊断命令并返回合并输出，避免异常中断全部检查。"""
+    try:
+        result = subprocess.run(
+            [executable, *arguments],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return 1, str(exc)
+    return result.returncode, f"{result.stdout}\n{result.stderr}".strip()
+
+
+def _check_app_tools(loaded: Settings) -> bool:
+    """执行 App 专项阻断检查；普通 API/Web doctor 不受设备状态影响。"""
+    checks: list[bool] = []
+    appium_command = shutil.which("appium.cmd") or shutil.which("appium")
+    if appium_command:
+        _print_check("通过", f"Appium Server: {appium_command}")
+        code, output = _command_output(appium_command, "driver", "list", "--installed")
+        driver_ready = code == 0 and "uiautomator2" in output.lower()
+        _print_check("通过" if driver_ready else "失败", "UiAutomator2 Driver 已安装" if driver_ready else "未找到可用的 UiAutomator2 Driver")
+        checks.append(driver_ready)
+    else:
+        _print_check("失败", "未找到 Appium Server；运行 npm install -g appium")
+        checks.append(False)
+
+    platform = str(loaded.app.get("platform", "Android")).lower()
+    if platform != "android":
+        supported = sys.platform == "darwin"
+        _print_check("通过" if supported else "失败", "iOS 自动化运行主机必须是 macOS")
+        checks.append(supported)
+        return all(checks)
+
+    android_home = os.getenv("ANDROID_HOME") or os.getenv("ANDROID_SDK_ROOT")
+    android_home_ready = bool(android_home and Path(android_home).is_dir())
+    _print_check(
+        "通过" if android_home_ready else "失败",
+        f"ANDROID_HOME: {android_home}" if android_home_ready else "ANDROID_HOME 未设置或目录不存在",
+    )
+    checks.append(android_home_ready)
+
+    java_home = os.getenv("JAVA_HOME")
+    java_home_ready = bool(java_home and (Path(java_home) / "bin" / "java.exe").is_file())
+    _print_check(
+        "通过" if java_home_ready else "失败",
+        f"JAVA_HOME: {java_home}" if java_home_ready else "JAVA_HOME 未设置或 JDK 不完整",
+    )
+    checks.append(java_home_ready)
+
+    adb_command = shutil.which("adb")
+    emulator_command = shutil.which("emulator")
+    for label, command in (("adb", adb_command), ("emulator", emulator_command)):
+        _print_check("通过" if command else "失败", f"{label}: {command}" if command else f"未找到 {label} 命令")
+        checks.append(bool(command))
+
+    caps = loaded.app_caps()
+    app_path = caps.get("app")
+    installed_app_ready = bool(caps.get("appPackage") and caps.get("appActivity"))
+    if app_path:
+        app_ready = Path(str(app_path)).is_file()
+        message = f"安装包存在: {app_path}" if app_ready else f"安装包不存在: {app_path}"
+    else:
+        app_ready = installed_app_ready
+        message = (
+            "已配置已安装 App 的 appPackage/appActivity"
+            if app_ready
+            else "请在 .env 设置 APP_PATH，或配置 appPackage/appActivity"
+        )
+    _print_check("通过" if app_ready else "失败", message)
+    checks.append(app_ready)
+
+    if caps.get("avd") and emulator_command:
+        code, output = _command_output(emulator_command, "-list-avds")
+        avd_ready = code == 0 and str(caps["avd"]) in output.splitlines()
+        _print_check(
+            "通过" if avd_ready else "失败",
+            f"模拟器已创建: {caps['avd']}" if avd_ready else f"未找到模拟器: {caps['avd']}",
+        )
+        checks.append(avd_ready)
+    elif caps.get("udid") and adb_command:
+        code, output = _command_output(adb_command, "devices")
+        device_ready = code == 0 and f"{caps['udid']}\tdevice" in output
+        _print_check(
+            "通过" if device_ready else "失败",
+            f"真机/设备在线: {caps['udid']}" if device_ready else f"设备未在线: {caps['udid']}",
+        )
+        checks.append(device_ready)
+    else:
+        _print_check("失败", "未配置 APPIUM_AVD 或 APPIUM_UDID")
+        checks.append(False)
+
+    return all(checks)
+
+
+def doctor(environment: str, test_type: str | None = None) -> int:
     print("自动化测试框架环境检查")
     print("=" * 40)
     checks = [_check_python(), _check_imports(), _check_config(environment)]
     _check_virtual_environment()
     _check_optional_tools()
+    if test_type in {"app", "all"}:
+        try:
+            checks.append(_check_app_tools(Settings(config_file=CONFIG_FILE, env=environment)))
+        except ValueError as exc:
+            _print_check("失败", str(exc))
+            checks.append(False)
     return 0 if all(checks) else 1
+
+
+def run_app_smoke(environment: str, allow_prod: bool = False) -> int:
+    """创建一次真实 Appium Session，验证 Server、设备和安装包完整链路。"""
+    try:
+        ensure_environment_allowed(environment, allow_prod)
+    except pytest.UsageError as exc:
+        _print_check("失败", str(exc))
+        return 2
+
+    from config.settings import settings as project_settings
+    from core.app_driver import create_app_driver, start_managed_appium_service
+
+    project_settings.reload(environment)
+    service = None
+    driver = None
+    try:
+        service = start_managed_appium_service()
+        driver = create_app_driver()
+        _print_check("通过", f"Appium Session: {driver.session_id}")
+        _print_check("通过", f"当前 package/activity: {driver.current_package}/{driver.current_activity}")
+        return 0
+    except Exception as exc:  # noqa: BLE001
+        _print_check("失败", f"Appium 冒烟连接失败: {exc}")
+        return 1
+    finally:
+        if driver is not None:
+            driver.quit()
+        if service is not None:
+            service.stop()
 
 
 def clean_generated_files() -> int:
@@ -228,6 +363,11 @@ def create_parser() -> argparse.ArgumentParser:
 
     doctor_parser = subparsers.add_parser("doctor", help="检查本机环境和项目配置")
     doctor_parser.add_argument("--env", default=os.getenv("ENV", "uat"))
+    doctor_parser.add_argument("--type", choices=TEST_PATHS, default=None)
+
+    app_smoke_parser = subparsers.add_parser("app-smoke", help="创建真实 Appium Session")
+    app_smoke_parser.add_argument("--env", default=os.getenv("ENV", "uat"))
+    app_smoke_parser.add_argument("--allow-prod", action="store_true")
 
     subparsers.add_parser("self-test", help="运行完全离线的框架自测")
     subparsers.add_parser("clean", help="清理报告、日志和缓存")
@@ -252,7 +392,9 @@ def create_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = create_parser().parse_args(argv)
     if args.command == "doctor":
-        return doctor(args.env)
+        return doctor(args.env, args.type)
+    if args.command == "app-smoke":
+        return run_app_smoke(args.env, args.allow_prod)
     if args.command == "self-test":
         return run_pytest(["-m", "pytest", "tests/framework"])
     if args.command == "clean":

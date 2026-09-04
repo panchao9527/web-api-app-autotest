@@ -1,8 +1,10 @@
 from scripts.automation import (
     build_pytest_command,
+    create_parser,
     main,
     normalize_pytest_exit_code,
     playwright_browser_installed,
+    run_app_smoke,
 )
 
 
@@ -62,4 +64,22 @@ def test_prod_blocking_returns_clear_cli_error(monkeypatch, capsys):
     exit_code = main(["test", "--type", "api", "--env", "prod"])
 
     assert exit_code == 2
+    assert "[失败]" in capsys.readouterr().out
+
+
+def test_parser_supports_app_specific_doctor_and_smoke():
+    parser = create_parser()
+
+    doctor_args = parser.parse_args(["doctor", "--env", "uat", "--type", "app"])
+    smoke_args = parser.parse_args(["app-smoke", "--env", "sit"])
+
+    assert doctor_args.type == "app"
+    assert smoke_args.command == "app-smoke"
+    assert smoke_args.env == "sit"
+
+
+def test_app_smoke_is_blocked_in_prod_by_default(monkeypatch, capsys):
+    monkeypatch.delenv("ALLOW_PROD_TESTS", raising=False)
+
+    assert run_app_smoke("prod") == 2
     assert "[失败]" in capsys.readouterr().out

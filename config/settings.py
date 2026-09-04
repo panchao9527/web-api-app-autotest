@@ -20,6 +20,28 @@ def _require_http_url(name: str, value: str) -> str:
     return str(value).rstrip("/")
 
 
+def _environment_bool(name: str, default: bool) -> bool:
+    """读取布尔环境变量，避免把任意非空字符串都误判为 True。"""
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return default
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"环境变量 {name} 仅支持 1/0、true/false、yes/no 或 on/off")
+
+
+def _application_path(value: str) -> str:
+    """把安装包路径规范为绝对路径；文件是否存在由 doctor 在运行前检查。"""
+    path = Path(os.path.expandvars(value)).expanduser()
+    if not path.is_absolute():
+        path = ROOT_DIR / path
+    # 不调用 resolve()，避免 Windows 商店应用环境把 AppData 路径改写到 LocalCache。
+    return str(path.absolute())
+
+
 class Settings:
     """读取 YAML 和环境变量，并暴露兼容的属性接口。"""
 
@@ -77,9 +99,37 @@ class Settings:
         self.web["browser"] = browser
 
         self.app = dict(raw.get("app", {}))
-        platform = str(self.app.get("platform", "Android")).lower()
+        self.app["platform"] = os.getenv("APPIUM_PLATFORM") or self.app.get(
+            "platform", "Android"
+        )
+        self.app["appium_server"] = _require_http_url(
+            "app.appium_server",
+            os.getenv("APPIUM_SERVER") or self.app.get("appium_server", "http://127.0.0.1:4723"),
+        )
+        self.app["manage_server"] = _environment_bool(
+            "APPIUM_MANAGE_SERVER", bool(self.app.get("manage_server", False))
+        )
+
+        platform = str(self.app["platform"]).lower()
         if platform not in SUPPORTED_APP_PLATFORMS:
             raise ValueError(f"配置 app.platform 仅支持 Android/iOS，实际值: {platform!r}")
+        platform_config = dict(self.app.get(platform, {}))
+        overrides = {
+            "app": os.getenv("APP_PATH"),
+            "avd": os.getenv("APPIUM_AVD"),
+            "udid": os.getenv("APPIUM_UDID"),
+            "appPackage": os.getenv("APP_PACKAGE"),
+            "appActivity": os.getenv("APP_ACTIVITY"),
+            "platformVersion": os.getenv("APPIUM_PLATFORM_VERSION"),
+        }
+        for key, value in overrides.items():
+            if value and value.strip():
+                platform_config[key] = _application_path(value) if key == "app" else value.strip()
+        if os.getenv("APPIUM_UDID"):
+            platform_config.pop("avd", None)
+        elif os.getenv("APPIUM_AVD"):
+            platform_config.pop("udid", None)
+        self.app[platform] = platform_config
 
         db_cfg = dict(self._env_cfg.get("db", {}))
         db_cfg["user"] = os.getenv("DB_USER", db_cfg.get("user", ""))
@@ -122,7 +172,11 @@ class Settings:
 
     def app_caps(self) -> dict:
         platform = str(self.app.get("platform", "Android")).lower()
-        return dict(self.app.get(platform, {}))
+        return {
+            key: value
+            for key, value in dict(self.app.get(platform, {})).items()
+            if value is not None and value != ""
+        }
 
 
 settings = Settings()

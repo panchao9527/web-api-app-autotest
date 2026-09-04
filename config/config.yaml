@@ -68,14 +68,19 @@ web:
 # App (Appium) 配置
 app:
   appium_server: "http://127.0.0.1:4723"
+  manage_server: true           # true = 测试启动时自动管理本机 Appium Server
   platform: "Android"        # Android / iOS
   android:
     platformName: "Android"
     automationName: "UiAutomator2"
-    deviceName: "emulator-5554"
-    appPackage: "com.example.app"
-    appActivity: ".MainActivity"
-    noReset: true
+    deviceName: "Android Emulator"  # 仅作描述；选择设备请使用 avd 或 APPIUM_UDID
+    avd: "Pixel_6_API_34"
+    noReset: false              # 默认保持用例隔离；需要复用登录态时再按项目调整
+    autoGrantPermissions: true
+    newCommandTimeout: 120
+    adbExecTimeout: 60000
+    avdLaunchTimeout: 120000
+    avdReadyTimeout: 120000
   ios:
     platformName: "iOS"
     automationName: "XCUITest"
