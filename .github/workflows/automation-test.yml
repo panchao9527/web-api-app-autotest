@@ -109,7 +109,14 @@ jobs:
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           PYTEST_ADDOPTS: --alluredir=reports/allure-web --clean-alluredir --junitxml=reports/junit-web.xml
-        run: python scripts/automation.py test --type web --env uat --marker "$TEST_MARKER"
+        run: python scripts/automation.py test --type web --env uat --marker "$TEST_MARKER" --tracing retain-on-failure
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-traces
+          path: reports/web-evidence
+          retention-days: 7
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:

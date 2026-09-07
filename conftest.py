@@ -7,6 +7,7 @@
 import json
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import uuid4
 
 import allure
@@ -91,6 +92,14 @@ def pytest_configure(config):
             sys.argv,
             bool(settings.web.get("trace", False)),
         )
+        config._trace_retention = config.option.tracing
+        # 插件在 teardown 报告产生前清理文件；延迟保留决策以覆盖清理失败。
+        if config._trace_retention == "retain-on-failure":
+            config.option.tracing = "on"
+        output_base = Path(config.option.output)
+        if str(output_base) == "test-results":
+            output_base = settings.root_dir / "reports" / "web-evidence"
+        config.option.output = str(output_base / uuid4().hex[:12])
     log.info("=" * 60)
     log.info(f"测试启动 | 环境: {settings.env} | base_url: {settings.api_base_url}")
     log.info("=" * 60)
@@ -163,6 +172,30 @@ def pytest_runtest_makereport(item, call):
 
     if report.failed:
         _attach_failure_evidence(item, report.when)
+        item._web_failed = True
+    if report.when == "teardown":
+        _finish_web_traces(item)
+
+
+def _finish_web_traces(item):
+    """插件已导出所有 Context 的 Trace，此时 Allure 用例尚未关闭。"""
+    output = getattr(item, "_web_output", None)
+    if output is None:
+        return
+    mode = getattr(item.config, "_trace_retention", "off")
+    for trace in Path(output).glob("trace*.zip"):
+        try:
+            if mode == "retain-on-failure" and not getattr(item, "_web_failed", False):
+                trace.unlink()
+            elif mode != "off":
+                allure.attach.file(
+                    str(trace),
+                    name=f"Playwright {trace.name}",
+                    attachment_type="application/zip",
+                    extension="zip",
+                )
+        except Exception as exc:
+            log.warning(f"Trace 证据处理失败: {redact_text(str(exc))}")
 
 
 def _attach_json(data: dict, name: str) -> None:
@@ -227,6 +260,15 @@ def env_settings():
 # Web (Playwright) 配置注入
 # 覆盖 pytest-playwright 内置 fixture，让浏览器读 config.yaml 的设置
 # ---------------------------------------------------------------------------
+@pytest.fixture
+def output_path(output_path, request):
+    # UUID 隔离重试；上层运行目录隔离并发 worker 和独立运行。
+    path = str(Path(output_path) / uuid4().hex[:8])
+    request.node._web_output = path
+    request.node._web_failed = False
+    return path
+
+
 @pytest.fixture(scope="session")
 def browser_type_launch_args(browser_type_launch_args):
     from core.web_driver import browser_launch_args, merge_launch_args

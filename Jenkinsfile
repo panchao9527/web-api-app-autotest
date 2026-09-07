@@ -38,7 +38,7 @@ pipeline {
                     steps {
                         sh '''
                             python3 -m playwright install --with-deps chromium
-                            PYTEST_ADDOPTS="--alluredir=reports/allure-web --clean-alluredir --junitxml=reports/junit-web.xml" python3 scripts/automation.py test --type web --env uat --marker "${TEST_MARKER}"
+                            PYTEST_ADDOPTS="--alluredir=reports/allure-web --clean-alluredir --junitxml=reports/junit-web.xml" python3 scripts/automation.py test --type web --env uat --marker "${TEST_MARKER}" --tracing retain-on-failure
                         '''
                     }
                 }
@@ -48,6 +48,7 @@ pipeline {
 
     post {
         always {
+            archiveArtifacts artifacts: 'reports/web-evidence/**/*.zip', allowEmptyArchive: true
             junit allowEmptyResults: true, testResults: 'reports/junit-*.xml'
             allure includeProperties: false, results: [
                 [path: 'reports/allure-framework'],
