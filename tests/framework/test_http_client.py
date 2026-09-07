@@ -102,3 +102,19 @@ def test_prod_client_blocks_write_and_cross_origin_requests(monkeypatch):
         client.get("https://other.example.com/users")
 
     assert session.calls == []
+
+
+@pytest.mark.parametrize(
+    "token, expected", [(None, "Bearer configured"), ("", None), ("role", "Bearer role")]
+)
+def test_explicit_anonymous_token_does_not_fall_back_to_environment(monkeypatch, token, expected):
+    monkeypatch.setattr("core.http_client.settings.api_token", "configured")
+    session = requests.Session()
+    session.headers["Authorization"] = "Bearer previous"
+    session.auth = ("old-user", "old-password")
+    session.cookies.set("session", "old-cookie")
+    with HttpClient(session=session, token=token):
+        assert session.headers.get("Authorization") == expected
+        if token == "":
+            assert session.auth is None
+            assert not session.cookies

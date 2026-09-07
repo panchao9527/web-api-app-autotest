@@ -40,3 +40,23 @@ def test_github_workflow_has_framework_gate_and_pages_permission():
     assert "contents: write" in text
     assert "automation.py self-test" in text
     assert 'python-version: ["3.10", "3.11", "3.12"]' in text
+
+
+def test_business_ci_is_explicit_and_reports_exclude_framework_results():
+    text = Path(".github/workflows/automation-test.yml").read_text(encoding="utf-8")
+    assert text.count("branches: [main, release]") == 2
+    assert "vars.ENABLE_API_TESTS == 'true'" in text
+    assert "vars.ENABLE_WEB_TESTS == 'true'" in text
+    assert "BOSS_STORAGE_STATE_JSON:" in text
+    assert "name: framework-allure-" in text
+    assert "name: framework-junit-" in text
+    assert "vars.PUBLISH_ALLURE_PAGES == 'true'" in text
+    assert "--allow-empty" not in text
+
+
+def test_android_setup_does_not_mutate_persistent_java_environment():
+    text = Path("scripts/setup_android_emulator.ps1").read_text(encoding="utf-8")
+    assert "SetEnvironmentVariable" not in text
+    assert "aka.ms/download-jdk" not in text
+    assert "Assert-NativeSuccess" in text
+    assert "--installed --json" in text

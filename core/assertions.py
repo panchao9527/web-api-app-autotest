@@ -1,166 +1,179 @@
-"""
-自定义断言库
-- 统一断言风格，失败信息清晰，自动记录日志 + Allure step
-- 覆盖：通用断言 / 数值比较 / 空值长度 / 文本正则 / 浮点近似 / 接口响应 / JSONPath 嵌套取值 / Schema 契约
-- 用法: from core.assertions import Assert
-"""
+"""统一断言：比较原始值，日志/异常仅输出脱敏副本，不自动向 Allure 传入原始参数。"""
 
 import re
+from functools import wraps
 
 import allure
 from jsonschema import ValidationError, validate
 
 from utils.logger import log
+from utils.redaction import MASK, redact, redact_text, safe_input_value
+
+
+def _step(title):
+    """固定步骤标题，避免 allure.step 装饰器自动采集 actual/expected。"""
+
+    def decorate(function):
+        @wraps(function)
+        def wrapped(*args, **kwargs):
+            with allure.step(title):
+                return function(*args, **kwargs)
+
+        return wrapped
+
+    return decorate
+
+
+def _safe(value, sensitive=False):
+    return MASK if sensitive else str(redact(value))
+
+
+def _check(condition, message):
+    safe_message = redact_text(message)
+    log.info(safe_message)
+    if not condition:
+        raise AssertionError(safe_message)
 
 
 def _to_data(resp):
-    """兼容 requests.Response 或已是 dict/list 的数据"""
     return resp.json() if hasattr(resp, "json") else resp
 
 
 class Assert:
-    # ---------------- 通用 ----------------
     @staticmethod
-    @allure.step("断言相等: {msg}")
-    def equal(actual, expected, msg=""):
-        log.info(f"断言相等 | 实际={actual} 期望={expected} | {msg}")
-        assert actual == expected, f"{msg} | 期望 {expected}，实际 {actual}"
+    @_step("断言相等")
+    def equal(actual, expected, msg="", sensitive=False):
+        """无字段名的秘密标量请显式传 sensitive=True。"""
+        _check(
+            actual == expected,
+            f"{msg} | 期望 {_safe(expected, sensitive)}，实际 {_safe(actual, sensitive)}",
+        )
 
     @staticmethod
-    @allure.step("断言不相等: {msg}")
-    def not_equal(actual, expected, msg=""):
-        log.info(f"断言不等 | 实际={actual} 不应={expected} | {msg}")
-        assert actual != expected, f"{msg} | 不应等于 {expected}，实际 {actual}"
+    @_step("断言不相等")
+    def not_equal(actual, expected, msg="", sensitive=False):
+        _check(
+            actual != expected,
+            f"{msg} | 实际 {_safe(actual, sensitive)}，不应为 {_safe(expected, sensitive)}",
+        )
 
     @staticmethod
-    @allure.step("断言为真: {msg}")
+    @_step("断言为真")
     def is_true(condition, msg=""):
-        log.info(f"断言为真 | {msg}")
-        assert condition, f"断言失败(应为真) | {msg}"
+        _check(condition, f"{msg} | 断言应为真")
 
     @staticmethod
-    @allure.step("断言为假: {msg}")
+    @_step("断言为假")
     def is_false(condition, msg=""):
-        log.info(f"断言为假 | {msg}")
-        assert not condition, f"断言失败(应为假) | {msg}"
+        _check(not condition, f"{msg} | 断言应为假")
 
     @staticmethod
-    @allure.step("断言包含: {msg}")
+    @_step("断言包含")
     def contains(container, member, msg=""):
-        log.info(f"断言包含 | {member} in {container} | {msg}")
-        assert member in container, f"{msg} | {container} 中不包含 {member}"
+        _check(member in container, f"{msg} | {_safe(container)} 应包含 {_safe(member)}")
 
     @staticmethod
-    @allure.step("断言不包含: {msg}")
+    @_step("断言不包含")
     def not_contains(container, member, msg=""):
-        log.info(f"断言不包含 | {member} not in ... | {msg}")
-        assert member not in container, f"{msg} | 不应包含 {member}"
+        _check(member not in container, f"{msg} | {_safe(container)} 不应包含 {_safe(member)}")
 
-    # ---------------- 空值 / 长度 ----------------
     @staticmethod
-    @allure.step("断言为 None: {msg}")
+    @_step("断言为 None")
     def is_none(actual, msg=""):
-        assert actual is None, f"{msg} | 期望 None，实际 {actual}"
+        _check(actual is None, f"{msg} | 期望 None，实际 {_safe(actual)}")
 
     @staticmethod
-    @allure.step("断言非 None: {msg}")
+    @_step("断言非 None")
     def not_none(actual, msg=""):
-        assert actual is not None, f"{msg} | 不应为 None"
+        _check(actual is not None, f"{msg} | 不应为 None")
 
     @staticmethod
-    @allure.step("断言非空: {msg}")
+    @_step("断言非空")
     def not_empty(actual, msg=""):
-        """非空：字符串/列表/字典等长度 > 0"""
-        log.info(f"断言非空 | 实际={actual} | {msg}")
-        assert actual, f"{msg} | 期望非空，实际为空: {actual!r}"
+        _check(bool(actual), f"{msg} | 期望非空，实际 {_safe(actual)}")
 
     @staticmethod
-    @allure.step("断言长度 == {expected}")
+    @_step("断言长度")
     def length(obj, expected, msg=""):
-        actual = len(obj)
-        log.info(f"断言长度 | 实际={actual} 期望={expected} | {msg}")
-        assert actual == expected, f"{msg} | 长度期望 {expected}，实际 {actual}"
+        _check(len(obj) == expected, f"{msg} | 长度期望 {expected}，实际 {len(obj)}")
 
-    # ---------------- 数值比较 ----------------
     @staticmethod
-    @allure.step("断言 {actual} > {expected}")
+    @_step("断言大于")
     def greater(actual, expected, msg=""):
-        assert actual > expected, f"{msg} | 期望 >{expected}，实际 {actual}"
+        _check(actual > expected, f"{msg} | 期望 >{_safe(expected)}，实际 {_safe(actual)}")
 
     @staticmethod
-    @allure.step("断言 {actual} < {expected}")
+    @_step("断言小于")
     def less(actual, expected, msg=""):
-        assert actual < expected, f"{msg} | 期望 <{expected}，实际 {actual}"
+        _check(actual < expected, f"{msg} | 期望 <{_safe(expected)}，实际 {_safe(actual)}")
 
     @staticmethod
-    @allure.step("断言 {low} <= {actual} <= {high}")
+    @_step("断言闭区间")
     def between(actual, low, high, msg=""):
-        """范围断言(闭区间)"""
-        assert low <= actual <= high, f"{msg} | 期望 [{low},{high}]，实际 {actual}"
+        _check(
+            low <= actual <= high,
+            f"{msg} | 期望 [{_safe(low)},{_safe(high)}]，实际 {_safe(actual)}",
+        )
 
     @staticmethod
-    @allure.step("断言近似相等(容差 {tol})")
+    @_step("断言近似相等")
     def approx(actual, expected, tol=0.01, msg=""):
-        """浮点近似相等(金额/税率常用，避免精度问题)"""
-        log.info(f"断言近似 | 实际={actual} 期望={expected} 容差={tol} | {msg}")
-        assert abs(float(actual) - float(expected)) <= tol, (
-            f"{msg} | 期望≈{expected}(±{tol})，实际 {actual}"
+        _check(
+            abs(float(actual) - float(expected)) <= tol,
+            f"{msg} | 期望≈{_safe(expected)}(±{tol})，实际 {_safe(actual)}",
         )
 
-    # ---------------- 文本 / 正则 ----------------
     @staticmethod
-    @allure.step("断言匹配正则: {pattern}")
+    @_step("断言正则匹配")
     def match_regex(text, pattern, msg=""):
-        log.info(f"断言正则 | {pattern} ~ {text} | {msg}")
-        assert re.search(pattern, str(text)), f"{msg} | {text} 不匹配 /{pattern}/"
-
-    # ---------------- 接口响应 ----------------
-    @staticmethod
-    @allure.step("断言状态码 == {expected}")
-    def status_code(resp, expected=200):
-        actual = resp.status_code
-        log.info(f"断言状态码 | 实际={actual} 期望={expected}")
-        assert actual == expected, (
-            f"状态码不符 | 期望 {expected}，实际 {actual} | 响应: {resp.text[:300]}"
+        _check(
+            re.search(pattern, str(text)) is not None,
+            f"{msg} | {_safe(text)} 应匹配 {_safe(pattern)}",
         )
 
     @staticmethod
-    @allure.step("断言响应顶层字段 {key} == {expected}")
+    @_step("断言 HTTP 状态码")
+    def status_code(resp, expected=200):
+        # 正文已由 HttpClient 脱敏附加，不在异常消息里再次输出原文。
+        _check(resp.status_code == expected, f"状态码期望 {expected}，实际 {resp.status_code}")
+
+    @staticmethod
+    @_step("断言响应字段")
     def json_value(resp, key, expected):
-        """断言响应【顶层】字段；嵌套字段请用 jsonpath()"""
         actual = _to_data(resp).get(key)
-        log.info(f"断言响应字段 | {key}: 实际={actual} 期望={expected}")
-        assert actual == expected, f"字段 {key} 不符 | 期望 {expected}，实际 {actual}"
+        _check(
+            actual == expected,
+            f"字段 {key} | 期望 {safe_input_value(redact(expected), key)}，实际 {safe_input_value(redact(actual), key)}",
+        )
 
     @staticmethod
-    @allure.step("断言 JSONPath {expr} == {expected}")
+    @_step("断言 JSONPath 字段")
     def jsonpath(resp, expr, expected):
-        """
-        断言【嵌套】字段，用 JSONPath 定位，如 "$.data.order.status"。
-        解决 json_value 只能取顶层的局限。
-        """
         from utils.extractor import extract
 
         actual = extract(_to_data(resp), expr)
-        log.info(f"断言JSONPath | {expr}: 实际={actual} 期望={expected}")
-        assert actual == expected, f"{expr} 不符 | 期望 {expected}，实际 {actual}"
+        _check(
+            actual == expected,
+            f"{expr} | 期望 {safe_input_value(redact(expected), expr)}，实际 {safe_input_value(redact(actual), expr)}",
+        )
 
     @staticmethod
-    @allure.step("断言 JSONPath {expr} 存在且非空")
+    @_step("断言 JSONPath 存在且非空")
     def jsonpath_exists(resp, expr):
-        """断言某嵌套字段存在且非空(如返回里必须有 token/order_id)"""
         from utils.extractor import extract
 
         actual = extract(_to_data(resp), expr)
-        log.info(f"断言JSONPath存在 | {expr}: {actual}")
-        assert actual is not None and actual != "", f"{expr} 不存在或为空"
+        _check(actual is not None and actual != "", f"{expr} 应存在且非空")
 
     @staticmethod
-    @allure.step("断言响应符合 JSON Schema")
+    @_step("断言 JSON Schema")
     def match_schema(resp, schema: dict):
-        """校验响应结构是否符合预期 schema (契约测试常用)"""
         try:
             validate(instance=_to_data(resp), schema=schema)
-            log.info("JSON Schema 校验通过")
-        except ValidationError as e:
-            raise AssertionError(f"响应结构不符合 schema: {e.message}") from e
+        except ValidationError as exc:
+            # jsonschema.message 携带失败原值，因此只报告字段路径和校验规则。
+            path = ".".join(str(part) for part in exc.absolute_path) or "$"
+            raise AssertionError(
+                f"响应结构不符合 schema: 字段 {path}，规则 {exc.validator}"
+            ) from None
+        log.info("JSON Schema 校验通过")

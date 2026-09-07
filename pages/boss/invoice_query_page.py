@@ -29,9 +29,11 @@ class InvoiceQueryPage(BasePage):
         return response.request.method == "POST" and InvoiceQueryPage.DETAIL_API in response.url
 
     def _first_data_row(self):
-        return self.page.locator(self.TABLE_ROWS).filter(
-            has=self.page.get_by_text("查看", exact=True)
-        ).first
+        return (
+            self.page.locator(self.TABLE_ROWS)
+            .filter(has=self.page.get_by_text("查看", exact=True))
+            .first
+        )
 
     @allure.step("打开 BOSS 发票查询页")
     def open_list(self) -> Response:

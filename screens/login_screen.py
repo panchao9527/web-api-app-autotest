@@ -16,11 +16,12 @@ class LoginScreen(BaseScreen):
     MSG_ERROR = (BaseScreen.ID, "com.example.app:id/tv_error")
     HOME_TAB = (BaseScreen.ACCESSIBILITY_ID, "home_tab")
 
-    @allure.step("App 登录: {username}")
     def login(self, username: str, password: str):
-        self.input(*self.INPUT_USERNAME, username)
-        self.input(*self.INPUT_PASSWORD, password, sensitive=True)
-        self.click(*self.BTN_LOGIN)
+        # 登录方法不能用自动收集参数的 Allure 装饰器，否则 password 会进入报告。
+        with allure.step("App 登录"):
+            self.input(*self.INPUT_USERNAME, username, sensitive=True)
+            self.input(*self.INPUT_PASSWORD, password, sensitive=True)
+            self.click(*self.BTN_LOGIN)
 
     def get_error(self) -> str:
         return self.text(*self.MSG_ERROR)

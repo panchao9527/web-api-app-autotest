@@ -7,6 +7,7 @@ App 页面对象基类 (Appium / 移动端 PO 模式)
 
 import allure
 from appium.webdriver.common.appiumby import AppiumBy
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -31,35 +32,43 @@ class BaseScreen:
         """显式等待元素存在(出现即可，不要求可点击)"""
         return self.wait.until(EC.presence_of_element_located((by, value)))
 
+    def wait_visible(self, by, value):
+        """等待元素可见；读取只读/禁用控件时不要求可点击。"""
+        return self.wait.until(EC.visibility_of_element_located((by, value)))
+
+    def wait_hidden(self, by, value):
+        """等待加载遮罩或弹窗消失（不存在也视为已消失）。"""
+        return self.wait.until(EC.invisibility_of_element_located((by, value)))
+
     # ================= 基础操作 =================
     @allure.step("点击: {value}")
     def click(self, by, value):
         log.info(f"点击控件: {value}")
         self.find(by, value).click()
 
-    @allure.step("输入内容到: {value}")
     def input(self, by, value, text, sensitive: bool = False):
         safe_text = safe_input_value(text, value, sensitive)
         log.info(f"输入: {value} <- {safe_text}")
-        el = self.find(by, value)
-        el.clear()
-        el.send_keys(text)
+        with allure.step(f"输入内容到: {value}"):
+            el = self.find(by, value)
+            el.clear()
+            el.send_keys(text)
 
     @allure.step("清空: {value}")
     def clear(self, by, value):
         self.find(by, value).clear()
 
     def text(self, by, value) -> str:
-        return self.find(by, value).text
+        return self.wait_visible(by, value).text
 
     def get_attribute(self, by, value, name: str) -> str:
-        return self.find(by, value).get_attribute(name)
+        return self.wait_for(by, value).get_attribute(name)
 
     def is_displayed(self, by, value) -> bool:
         """元素是否可见(不等待，立即判断)"""
         try:
             return self.driver.find_element(by, value).is_displayed()
-        except Exception:  # noqa
+        except (NoSuchElementException, StaleElementReferenceException):
             return False
 
     # ================= 滑动(四方向) =================
@@ -117,11 +126,15 @@ class BaseScreen:
     @allure.step("滑动查找元素: {value}")
     def scroll_to_find(self, by, value, max_swipes: int = 8):
         """反复上滑直到元素出现(列表里找下方元素)，找不到抛异常"""
-        for i in range(max_swipes):
+        if max_swipes < 0:
+            raise ValueError("max_swipes 不能小于 0")
+        # 包含初始检查及最后一次滑动后的检查；0 表示只检查当前屏幕。
+        for i in range(max_swipes + 1):
             if self.is_displayed(by, value):
                 log.info(f"第{i}次滑动后找到: {value}")
                 return self.driver.find_element(by, value)
-            self.swipe_up()
+            if i < max_swipes:
+                self.swipe_up()
         raise AssertionError(f"滑动 {max_swipes} 次仍未找到元素: {value}")
 
     # ================= 手势 =================

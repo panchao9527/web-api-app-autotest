@@ -40,10 +40,11 @@ def build_pytest_command(
     command = ["-m", "pytest", TEST_PATHS[test_type]]
     marker_parts = [] if test_type == "all" else [test_type]
     if marker:
-        marker_parts.append(marker)
+        marker_parts.append(f"({marker})")
     if marker_parts:
         command.extend(["-m", " and ".join(marker_parts)])
     command.extend(["--env", environment])
+    command.append("--require-executed")
     if allow_prod:
         command.append("--allow-prod")
     if headed:
@@ -170,7 +171,7 @@ def _playwright_cache_roots() -> list[Path]:
     return roots
 
 
-def _check_optional_tools() -> None:
+def _check_optional_tools(loaded: Settings) -> None:
     if importlib.util.find_spec("playwright"):
         if playwright_browser_installed(_playwright_cache_roots()):
             _print_check("通过", "Playwright Chromium 已安装")
@@ -188,7 +189,7 @@ def _check_optional_tools() -> None:
     else:
         _print_check("提醒", "未找到 Appium Server；仅做 API/Web 测试可忽略")
 
-    platform = Settings(config_file=CONFIG_FILE).app.get("platform", "Android").lower()
+    platform = loaded.app.get("platform", "Android").lower()
     if platform == "android":
         if shutil.which("adb"):
             _print_check("通过", "已找到 Android adb 命令")
@@ -222,18 +223,24 @@ def _command_output(executable: str, *arguments: str) -> tuple[int, str]:
 def _check_app_tools(loaded: Settings) -> bool:
     """执行 App 专项阻断检查；普通 API/Web doctor 不受设备状态影响。"""
     checks: list[bool] = []
+    platform = str(loaded.app.get("platform", "Android")).lower()
+    driver_name = "uiautomator2" if platform == "android" else "xcuitest"
     appium_command = shutil.which("appium.cmd") or shutil.which("appium")
     if appium_command:
         _print_check("通过", f"Appium Server: {appium_command}")
-        code, output = _command_output(appium_command, "driver", "list", "--installed")
-        driver_ready = code == 0 and "uiautomator2" in output.lower()
-        _print_check("通过" if driver_ready else "失败", "UiAutomator2 Driver 已安装" if driver_ready else "未找到可用的 UiAutomator2 Driver")
+        code, output = _command_output(appium_command, "driver", "doctor", driver_name)
+        driver_ready = code == 0
+        _print_check(
+            "通过" if driver_ready else "失败",
+            f"{driver_name} doctor 通过"
+            if driver_ready
+            else f"{driver_name} doctor 失败，请执行 appium driver doctor {driver_name} 查看详情",
+        )
         checks.append(driver_ready)
     else:
         _print_check("失败", "未找到 Appium Server；运行 npm install -g appium")
         checks.append(False)
 
-    platform = str(loaded.app.get("platform", "Android")).lower()
     if platform != "android":
         supported = sys.platform == "darwin"
         _print_check("通过" if supported else "失败", "iOS 自动化运行主机必须是 macOS")
@@ -244,12 +251,15 @@ def _check_app_tools(loaded: Settings) -> bool:
     android_home_ready = bool(android_home and Path(android_home).is_dir())
     _print_check(
         "通过" if android_home_ready else "失败",
-        f"ANDROID_HOME: {android_home}" if android_home_ready else "ANDROID_HOME 未设置或目录不存在",
+        f"ANDROID_HOME: {android_home}"
+        if android_home_ready
+        else "ANDROID_HOME 未设置或目录不存在",
     )
     checks.append(android_home_ready)
 
     java_home = os.getenv("JAVA_HOME")
-    java_home_ready = bool(java_home and (Path(java_home) / "bin" / "java.exe").is_file())
+    java_binary = "java.exe" if sys.platform == "win32" else "java"
+    java_home_ready = bool(java_home and (Path(java_home) / "bin" / java_binary).is_file())
     _print_check(
         "通过" if java_home_ready else "失败",
         f"JAVA_HOME: {java_home}" if java_home_ready else "JAVA_HOME 未设置或 JDK 不完整",
@@ -258,11 +268,17 @@ def _check_app_tools(loaded: Settings) -> bool:
 
     adb_command = shutil.which("adb")
     emulator_command = shutil.which("emulator")
-    for label, command in (("adb", adb_command), ("emulator", emulator_command)):
-        _print_check("通过" if command else "失败", f"{label}: {command}" if command else f"未找到 {label} 命令")
+    caps = loaded.app_caps()
+    required_commands = [("adb", adb_command)]
+    if caps.get("avd"):
+        required_commands.append(("emulator", emulator_command))
+    for label, command in required_commands:
+        _print_check(
+            "通过" if command else "失败",
+            f"{label}: {command}" if command else f"未找到 {label} 命令",
+        )
         checks.append(bool(command))
 
-    caps = loaded.app_caps()
     app_path = caps.get("app")
     installed_app_ready = bool(caps.get("appPackage") and caps.get("appActivity"))
     if app_path:
@@ -288,7 +304,9 @@ def _check_app_tools(loaded: Settings) -> bool:
         checks.append(avd_ready)
     elif caps.get("udid") and adb_command:
         code, output = _command_output(adb_command, "devices")
-        device_ready = code == 0 and f"{caps['udid']}\tdevice" in output
+        device_ready = code == 0 and any(
+            line.split()[:2] == [str(caps["udid"]), "device"] for line in output.splitlines()
+        )
         _print_check(
             "通过" if device_ready else "失败",
             f"真机/设备在线: {caps['udid']}" if device_ready else f"设备未在线: {caps['udid']}",
@@ -306,10 +324,12 @@ def doctor(environment: str, test_type: str | None = None) -> int:
     print("=" * 40)
     checks = [_check_python(), _check_imports(), _check_config(environment)]
     _check_virtual_environment()
-    _check_optional_tools()
-    if test_type in {"app", "all"}:
+    if checks[-1]:
         try:
-            checks.append(_check_app_tools(Settings(config_file=CONFIG_FILE, env=environment)))
+            loaded = Settings(config_file=CONFIG_FILE, env=environment)
+            _check_optional_tools(loaded)
+            if test_type in {"app", "all"}:
+                checks.append(_check_app_tools(loaded))
         except ValueError as exc:
             _print_check("失败", str(exc))
             checks.append(False)
@@ -318,6 +338,10 @@ def doctor(environment: str, test_type: str | None = None) -> int:
 
 def run_app_smoke(environment: str, allow_prod: bool = False) -> int:
     """创建一次真实 Appium Session，验证 Server、设备和安装包完整链路。"""
+    # 会启动/安装 App，不能因为传了只读生产授权就放行。
+    if environment.lower() == "prod":
+        _print_check("失败", "App 连接验收可能安装或重置应用，禁止在生产环境执行")
+        return 2
     try:
         ensure_environment_allowed(environment, allow_prod)
     except pytest.UsageError as exc:
@@ -330,20 +354,28 @@ def run_app_smoke(environment: str, allow_prod: bool = False) -> int:
     project_settings.reload(environment)
     service = None
     driver = None
+    exit_code = 0
     try:
         service = start_managed_appium_service()
         driver = create_app_driver()
         _print_check("通过", f"Appium Session: {driver.session_id}")
-        _print_check("通过", f"当前 package/activity: {driver.current_package}/{driver.current_activity}")
-        return 0
+        if str(project_settings.app.get("platform", "Android")).lower() == "android":
+            _print_check(
+                "通过", f"当前 package/activity: {driver.current_package}/{driver.current_activity}"
+            )
     except Exception as exc:  # noqa: BLE001
         _print_check("失败", f"Appium 冒烟连接失败: {exc}")
-        return 1
+        exit_code = 1
     finally:
-        if driver is not None:
-            driver.quit()
-        if service is not None:
-            service.stop()
+        # 两项独立清理；driver 断连不能阻止关闭本次创建的 Server。
+        for resource, method in ((driver, "quit"), (service, "stop")):
+            if resource is not None:
+                try:
+                    getattr(resource, method)()
+                except Exception:  # noqa: BLE001
+                    _print_check("失败", f"App 资源清理失败: {method}，请检查设备/进程状态")
+                    exit_code = 1
+    return exit_code
 
 
 def clean_generated_files() -> int:

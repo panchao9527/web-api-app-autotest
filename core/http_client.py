@@ -23,9 +23,15 @@ class HttpClient:
         self.base_url = (base_url or settings.api_base_url).rstrip("/")
         self.session = session or requests.Session()
         self.timeout = timeout if timeout is not None else settings.timeout
-        selected_token = token or settings.api_token
+        # None 沿用环境配置；空字符串明确表示匿名，不能回退到 API_TOKEN。
+        selected_token = settings.api_token if token is None else token
         if selected_token:
             self.set_token(selected_token)
+        elif token == "":
+            self.session.headers.pop("Authorization", None)
+            self.session.auth = None
+            if hasattr(self.session, "cookies"):
+                self.session.cookies.clear()
 
     def set_token(self, token: str) -> None:
         self.session.headers.update({"Authorization": f"Bearer {token}"})

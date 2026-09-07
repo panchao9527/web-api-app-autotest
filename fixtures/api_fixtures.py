@@ -1,6 +1,6 @@
 """
 API 相关共享 fixture
-- logged_in_client: 登录态复用，避免每个用例重复登录
+- logged_in_client: 用例内登录态复用，用例间身份隔离
 - 通过 pytest_plugins 在 conftest 注册
 """
 
@@ -8,25 +8,40 @@ import pytest
 
 from api.user_api import UserApi
 from config.settings import settings
+from core.http_client import HttpClient
 from core.safety import ensure_write_allowed
 from utils.logger import log
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def logged_in_client():
     """
-    会话级登录态复用：整个测试会话只登录一次，
-    返回已带 token 的 HttpClient，需要鉴权的用例直接用。
+    每条用例使用独立登录客户端，避免角色/请求头修改污染其它用例。
+    接入新公司时，按真实协议修改 UserApi.login 和下方 token 校验。
     """
-    user_api = UserApi()
-    resp = user_api.login(settings.username, settings.password)
-    if resp.status_code != 200:
-        log.warning("登录态预置失败，需要鉴权的用例可能失败")
+    user_api = UserApi(client=HttpClient(token=""))
     try:
+        resp = user_api.login(settings.username, settings.password)
+        if resp.status_code != 200:
+            raise RuntimeError(f"登录预置失败：HTTP {resp.status_code}，请检查账号及登录接口")
+        try:
+            body = resp.json()
+        except ValueError:
+            raise RuntimeError("登录预置失败：响应不是 JSON") from None
+        token = body.get("token") if isinstance(body, dict) else None
+        if not isinstance(token, str) or not token.strip():
+            raise RuntimeError("登录预置失败：缺少有效 token，请按真实登录协议调整 UserApi")
         yield user_api.client
     finally:
         user_api.client.close()
-        log.info("会话结束，登录客户端已关闭")
+        log.info("用例结束，登录客户端已关闭")
+
+
+@pytest.fixture
+def anonymous_client():
+    """明确不使用 API_TOKEN；用于未登录、鉴权缺失等负向测试。"""
+    with HttpClient(token="") as client:
+        yield client
 
 
 @pytest.fixture
@@ -152,7 +167,7 @@ def clean_data():
 @pytest.fixture
 def api_client():
     """
-    提供一条用例内【共享的干净 HttpClient】(未登录)。
+    提供一条用例内共享的 HttpClient（默认继承 API_TOKEN；匿名请用 anonymous_client）。
     用途：场景级用例里多个接口模块共用同一个 client，让登录态(token/cookie)贯穿。
     用法:
         def test_flow(api_client):

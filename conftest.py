@@ -6,6 +6,8 @@
 
 import json
 import sys
+from datetime import datetime, timezone
+from uuid import uuid4
 
 import allure
 import pytest
@@ -29,12 +31,33 @@ DEFAULT_TIMEOUTS_BY_MARKER = {
 }
 
 
+class _ExecutionGate:
+    """统计实际执行结果；不依赖终端插件，xdist 主进程也会收到 worker 报告。"""
+
+    def __init__(self):
+        self.executed = 0
+
+    def pytest_runtest_logreport(self, report):
+        if (
+            report.when == "call"
+            and report.outcome in {"passed", "failed"}
+            and not hasattr(report, "wasxfail")
+        ):
+            self.executed += 1
+
+
 # ---------------------------------------------------------------------------
 # pytest hook
 # ---------------------------------------------------------------------------
 def pytest_addoption(parser):
     group = parser.getgroup("automation", "自动化框架")
     group.addoption("--env", action="store", default=None, help="运行环境，如 sit/uat/prod")
+    group.addoption(
+        "--require-executed",
+        action="store_true",
+        default=False,
+        help="业务门禁：全部跳过视为失败，不把未执行当作测试通过",
+    )
     group.addoption(
         "--allow-prod",
         action="store_true",
@@ -43,12 +66,20 @@ def pytest_addoption(parser):
     )
 
 
+@pytest.hookimpl(tryfirst=True)
 def pytest_configure(config):
     """运行开始前打印环境信息"""
     selected_env = config.getoption("--env") or settings.env
     if selected_env != settings.env:
         settings.reload(selected_env)
     ensure_environment_allowed(settings.env, config.getoption("--allow-prod"))
+    if config.getoption("--require-executed"):
+        config.pluginmanager.register(_ExecutionGate(), "business-execution-gate")
+    # 显式 --alluredir（例如 CI 的分端目录）优先，否则每次生成唯一目录。
+    if not getattr(config.option, "allure_report_dir", None):
+        run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid4().hex[:8]
+        config.option.allure_report_dir = str(settings.root_dir / "reports" / "runs" / run_id)
+    log.info(f"Allure 结果目录: {config.option.allure_report_dir}")
     if hasattr(config.option, "browser"):
         from core.web_driver import configured_browsers, configured_tracing
 
@@ -65,9 +96,20 @@ def pytest_configure(config):
     log.info("=" * 60)
 
 
+def pytest_report_header(config):
+    """在 pytest 标准头部显示报告位置，不依赖日志捕获设置。"""
+    return f"Allure results: {config.option.allure_report_dir}"
+
+
+@pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(config, items):
     """应用三端默认超时，并在生产环境只保留 prod_safe 用例。"""
     _apply_default_timeouts(items)
+
+    if any(item.get_closest_marker("app") for item in items) and (
+        config.getoption("numprocesses", default=0) or hasattr(config, "workerinput")
+    ):
+        raise pytest.UsageError("当前 App 使用单设备配置，请移除 -n；多设备需先隔离 udid 和端口")
 
     if settings.env != "prod":
         return
@@ -76,6 +118,23 @@ def pytest_collection_modifyitems(config, items):
     items[:] = selected
     if deselected:
         config.hook.pytest_deselected(items=deselected)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """保留原有失败码；只阻止业务范围全部 skip 的假绿色，兼容 xdist 主进程。"""
+    if exitstatus != 0 or not session.config.getoption("--require-executed"):
+        return
+    if getattr(session.config, "workerinput", None) is not None:
+        return  # worker 不单独判定整个业务范围，交由主进程汇总。
+    gate = session.config.pluginmanager.getplugin("business-execution-gate")
+    reporter = session.config.pluginmanager.getplugin("terminalreporter")
+    if gate is None or gate.executed == 0:
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+        message = "业务门禁失败：没有实际通过或失败的用例（可能全部跳过/预期失败）"
+        if reporter is not None:
+            reporter.write_sep("!", message)
+        else:
+            log.error(message)
 
 
 def _apply_default_timeouts(items) -> None:

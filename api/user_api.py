@@ -10,10 +10,10 @@ from api.base_api import BaseApi
 
 
 class UserApi(BaseApi):
-    @allure.step("登录: {username}")
     def login(self, username: str, password: str):
-        """登录并自动回填 token，实现登录态复用"""
-        resp = self.client.post("/api/login", json={"username": username, "password": password})
+        """调用登录接口；使用上下文步骤，避免 Allure 自动记录密码参数。"""
+        with allure.step("用户登录"):
+            resp = self.client.post("/api/login", json={"username": username, "password": password})
         # 登录成功则把 token 写回 client，后续请求自动带上
         if resp.status_code == 200:
             token = resp.json().get("token")

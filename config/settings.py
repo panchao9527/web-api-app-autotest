@@ -99,9 +99,7 @@ class Settings:
         self.web["browser"] = browser
 
         self.app = dict(raw.get("app", {}))
-        self.app["platform"] = os.getenv("APPIUM_PLATFORM") or self.app.get(
-            "platform", "Android"
-        )
+        self.app["platform"] = os.getenv("APPIUM_PLATFORM") or self.app.get("platform", "Android")
         self.app["appium_server"] = _require_http_url(
             "app.appium_server",
             os.getenv("APPIUM_SERVER") or self.app.get("appium_server", "http://127.0.0.1:4723"),

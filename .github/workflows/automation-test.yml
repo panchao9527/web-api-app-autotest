@@ -2,19 +2,19 @@ name: Automation Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, release]
   pull_request:
-    branches: [main]
+    branches: [main, release]
   schedule:
     - cron: "0 18 * * *" # 北京时间每天 02:00
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   ENV: uat
-  TEST_MARKER: ${{ github.event_name == 'schedule' && 'regression' || 'smoke' }}
+  TEST_MARKER: ${{ github.event_name == 'schedule' && 'smoke or regression' || 'smoke' }}
 
 jobs:
   framework-test:
@@ -30,6 +30,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - run: pip install -r requirements.txt
+      - name: 业务接入状态（未启用不等于验证通过）
+        env:
+          API_ENABLED: ${{ vars.ENABLE_API_TESTS }}
+          WEB_ENABLED: ${{ vars.ENABLE_WEB_TESTS }}
+        run: |
+          echo '离线框架检查不代表业务通过。业务仅在非 PR 事件及显式启用后运行。' >> "$GITHUB_STEP_SUMMARY"
+          echo "API ENABLE_API_TESTS=$API_ENABLED; Web ENABLE_WEB_TESTS=$WEB_ENABLED" >> "$GITHUB_STEP_SUMMARY"
+          echo 'App 当前由本地单设备执行，尚未配置 CI 设备。' >> "$GITHUB_STEP_SUMMARY"
       - name: 静态检查
         if: matrix.python-version == '3.12'
         run: |
@@ -42,17 +50,19 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: allure-results-framework-${{ matrix.python-version }}
+          name: framework-allure-${{ matrix.python-version }}
           path: reports/allure-framework
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: junit-framework-${{ matrix.python-version }}
+          name: framework-junit-${{ matrix.python-version }}
           path: reports/junit-framework.xml
           if-no-files-found: ignore
 
   api-test:
+    # 接入真实 API 用例和账号后，在仓库 Variables 显式设为 true。
+    if: github.event_name != 'pull_request' && vars.ENABLE_API_TESTS == 'true'
     needs: framework-test
     runs-on: ubuntu-latest
     steps:
@@ -82,6 +92,7 @@ jobs:
           if-no-files-found: ignore
 
   web-test:
+    if: github.event_name != 'pull_request' && vars.ENABLE_WEB_TESTS == 'true'
     needs: framework-test
     runs-on: ubuntu-latest
     steps:
@@ -94,6 +105,7 @@ jobs:
       - run: playwright install --with-deps chromium
       - name: 运行 Web 测试
         env:
+          BOSS_STORAGE_STATE_JSON: ${{ secrets.BOSS_STORAGE_STATE_JSON }}
           TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           PYTEST_ADDOPTS: --alluredir=reports/allure-web --clean-alluredir --junitxml=reports/junit-web.xml
@@ -113,7 +125,9 @@ jobs:
 
   report:
     needs: [framework-test, api-test, web-test]
-    if: always()
+    if: always() && (needs.api-test.result != 'skipped' || needs.web-test.result != 'skipped')
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -127,13 +141,20 @@ jobs:
           allure_results: reports/allure-results
           allure_report: allure-report
       - uses: peaceiris/actions-gh-pages@v4
+        # 报告可能有业务截图，默认不发布到公开 Pages。
+        if: vars.PUBLISH_ALLURE_PAGES == 'true'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: allure-report
+      - uses: actions/upload-artifact@v4
+        with:
+          name: business-allure-report
+          path: allure-report
+          retention-days: 7
 
   notify:
     needs: [framework-test, api-test, web-test, report]
-    if: always()
+    if: always() && (needs.api-test.result != 'skipped' || needs.web-test.result != 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -156,5 +177,5 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
-          REPORT_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          REPORT_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: python scripts/notify_from_junit.py junit

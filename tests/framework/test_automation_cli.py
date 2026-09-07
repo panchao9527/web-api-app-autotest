@@ -21,7 +21,8 @@ def test_build_web_command_preserves_cli_options():
     )
 
     assert command[:3] == ["-m", "pytest", "testcases/web"]
-    assert command[command.index("-m", 2) + 1] == "web and smoke"
+    assert command[command.index("-m", 2) + 1] == "web and (smoke)"
+    assert "--require-executed" in command
     assert "--headed" in command
     assert command[-2:] == ["--tracing", "retain-on-failure"]
     assert env["ENV"] == "uat"

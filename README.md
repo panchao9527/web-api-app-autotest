@@ -30,6 +30,7 @@ python scripts/automation.py self-test
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\setup_android_emulator.ps1
+. .\scripts\use_android_env.ps1
 python scripts/automation.py doctor --env uat --type app
 python scripts/automation.py app-smoke --env uat
 ```
@@ -43,7 +44,9 @@ python scripts/automation.py test --type app --env uat
 python scripts/automation.py test --type all --env uat --marker smoke
 ```
 
-> 业务目录尚无用例时命令会失败，避免 CI 假绿色。仅初始化模板时可临时增加 `--allow-empty`。
+> 业务目录无用例或全部跳过时命令会失败。`--allow-empty` 仅放行无用例，不放行全部跳过。
+> 每次执行默认使用独立的 `reports/runs/<运行编号>`，启动日志会显示 Allure 路径。
+> GitHub 的 API/Web 业务任务需分别设置仓库变量 `ENABLE_API_TESTS=true`、`ENABLE_WEB_TESTS=true`；未启用时明确跳过，不代表业务通过。
 
 ## 唯一操作手册
 

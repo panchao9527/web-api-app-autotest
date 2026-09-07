@@ -30,8 +30,7 @@ class BossLoginPage(BasePage):
         deadline = monotonic() + timeout_ms / 1_000
         while monotonic() < deadline:
             cookie_names = {
-                cookie["name"].lower()
-                for cookie in self.page.context.cookies(self.base_url)
+                cookie["name"].lower() for cookie in self.page.context.cookies(self.base_url)
             }
             if self.AUTH_COOKIE_NAME in cookie_names:
                 break
@@ -41,9 +40,7 @@ class BossLoginPage(BasePage):
 
         self.page.wait_for_url(f"{self.home_url}**", timeout=60_000)
         self.page.wait_for_load_state("domcontentloaded")
-        expect(self.page.get_by_role("tab", name="首页", exact=True)).to_be_visible(
-            timeout=60_000
-        )
+        expect(self.page.get_by_role("tab", name="首页", exact=True)).to_be_visible(timeout=60_000)
 
     @allure.step("保存 BOSS 登录态")
     def save_storage_state(self, path: str | Path) -> Path:

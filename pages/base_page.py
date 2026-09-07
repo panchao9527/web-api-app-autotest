@@ -63,20 +63,21 @@ class BasePage:
     def click_text(self, text: str, exact: bool = False):
         """按页面可见文本点击(链接/菜单/弹窗选项等)"""
         log.info(f"按文本点击: {text}")
-        self.page.get_by_text(text, exact=exact).first.click()
+        # 不隐式选择第一个匹配项，歧义定位应显式失败并由业务 Page 缩小范围。
+        self.page.get_by_text(text, exact=exact).click()
 
-    @allure.step("输入内容到 {selector}")
     def fill(self, selector: str, text: str, sensitive: bool = False):
         safe_text = safe_input_value(text, selector, sensitive)
         log.info(f"输入: {selector} <- {safe_text}")
-        self.page.fill(selector, text)
+        with allure.step(f"输入内容到 {selector}"):
+            self.page.fill(selector, text)
 
-    @allure.step("逐字输入内容到 {selector}")
     def type_text(self, selector: str, text: str, delay: int = 50, sensitive: bool = False):
         """模拟逐字输入(触发联想/校验等场景)"""
         safe_text = safe_input_value(text, selector, sensitive)
         log.info(f"逐字输入: {selector} <- {safe_text}")
-        self.page.type(selector, text, delay=delay)
+        with allure.step(f"逐字输入内容到 {selector}"):
+            self.page.type(selector, text, delay=delay)
 
     @allure.step("清空: {selector}")
     def clear(self, selector: str):
