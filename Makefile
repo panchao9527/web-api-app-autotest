@@ -31,10 +31,10 @@ regression:
 	python scripts/automation.py test --type all --marker regression
 
 parallel:
-	python -m pytest testcases -n 4
+	python -m pytest testcases/api testcases/web -m "not app" -n 4 --require-executed
 
 report:
-	allure serve reports/allure-results
+	python scripts/automation.py report
 
 clean:
 	python scripts/automation.py clean

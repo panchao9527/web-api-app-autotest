@@ -28,9 +28,10 @@ def appium_server_ready(server_url: str, timeout: float = 1.0) -> bool:
     try:
         with urlopen(status_url, timeout=timeout) as response:  # noqa: S310
             payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):
+            value = payload.get("value") if isinstance(payload, dict) else None
+            return response.status < 400 and isinstance(value, dict) and value.get("ready") is True
+    except (HTTPError, URLError, TimeoutError, ValueError, UnicodeError, OSError):
         return False
-    return response.status < 400 and bool(payload.get("value", {}).get("ready"))
 
 
 def build_appium_service_args(server_url: str, log_file: str | Path | None = None) -> list[str]:
@@ -39,6 +40,14 @@ def build_appium_service_args(server_url: str, log_file: str | Path | None = Non
     host = parsed.hostname or "127.0.0.1"
     if host not in LOCAL_APPIUM_HOSTS:
         raise ValueError(f"自动管理仅支持本机 Appium Server，实际地址: {server_url}")
+    if (
+        parsed.scheme != "http"
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("托管 Appium 仅支持不带凭据、查询参数和片段的本机 http URL")
 
     args = ["--address", host, "--port", str(parsed.port or 4723)]
     base_path = parsed.path.rstrip("/")
@@ -49,9 +58,41 @@ def build_appium_service_args(server_url: str, log_file: str | Path | None = Non
     return args
 
 
+def validate_app_target(app_cfg: dict, caps: dict) -> None:
+    """原生 App 前置校验；远程 Server 的文件路径不能用本机文件系统判断。"""
+    platform = str(app_cfg.get("platform", "Android")).lower()
+    if platform not in {"android", "ios"}:
+        raise ValueError(f"不支持的平台: {platform}")
+    app = caps.get("app")
+    if not app:
+        installed_target = (
+            caps.get("appPackage") and caps.get("appActivity")
+            if platform == "android"
+            else caps.get("bundleId")
+        )
+        if not installed_target:
+            raise ValueError(
+                "未指定测试 App：请配置 APP_PATH，或 Android 包名/启动页、iOS bundleId"
+            )
+        return
+    app = str(app)
+    if app.startswith(("http://", "https://")):
+        if not urlparse(app).hostname:
+            raise ValueError("安装包下载 URL 缺少主机名")
+        return  # URL 由 Appium 下载，不在前置校验阶段下载或安装。
+    server = urlparse(app_cfg.get("appium_server", "http://127.0.0.1:4723"))
+    if server.hostname in LOCAL_APPIUM_HOSTS:
+        path = Path(app).expanduser()
+        if not path.is_file() and not (
+            platform == "ios" and path.is_dir() and path.suffix == ".app"
+        ):
+            raise ValueError("本机安装包不存在，请检查 APP_PATH；尚未启动设备或创建 Session")
+
+
 def start_managed_appium_service() -> AppiumService | None:
     """按配置启动本机 Appium；复用已运行的 Server，且不接管外部进程。"""
     app_cfg = settings.app
+    validate_app_target(app_cfg, settings.app_caps())
     if not app_cfg.get("manage_server", False):
         return None
 
@@ -77,6 +118,7 @@ def create_app_driver():
     platform = app_cfg.get("platform", "Android").lower()
     server = app_cfg.get("appium_server", "http://127.0.0.1:4723")
     caps = settings.app_caps()
+    validate_app_target(app_cfg, caps)
 
     log.info(f"启动 App driver | 平台={platform} | server={server}")
 

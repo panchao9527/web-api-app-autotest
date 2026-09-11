@@ -94,7 +94,7 @@ def test_app_smoke_always_stops_owned_server(monkeypatch, create_failure, quit_f
     driver = Mock()
     if quit_failure:
         driver.quit.side_effect = RuntimeError("disconnected")
-    monkeypatch.setattr(automation.Settings, "reload", lambda self, env: self)
+    monkeypatch.setattr("config.settings.Settings.reload", lambda self, env: self)
     monkeypatch.setattr("core.app_driver.start_managed_appium_service", lambda: service)
     factory = (
         Mock(side_effect=RuntimeError("create failed"))

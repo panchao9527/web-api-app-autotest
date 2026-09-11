@@ -85,7 +85,6 @@ class Settings:
         if not isinstance(timeout, int | float) or isinstance(timeout, bool) or timeout <= 0:
             raise ValueError(f"配置 timeout 必须是正数，实际值: {timeout!r}")
         self.timeout = timeout
-        self.retry = self.common.get("retry", 0)
         self.log_level = str(self.common.get("log_level", "INFO")).upper()
         self.log_response = bool(self.common.get("log_response", True))
         self.log_response_max = int(self.common.get("log_response_max", 1000))

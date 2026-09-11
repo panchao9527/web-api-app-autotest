@@ -7,7 +7,6 @@
 # 公共配置（所有环境共享）
 common:
   timeout: 30                # 默认超时(秒)
-  retry: 0                   # 默认不重试；仅对已登记的幂等操作显式配置
   log_level: INFO
   log_response: true         # 是否在日志中打印接口返回报文(全局开关)
   log_response_max: 1000     # 返回报文最大打印长度，超出自动截断(防大报文刷屏)

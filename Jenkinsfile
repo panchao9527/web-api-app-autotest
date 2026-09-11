@@ -1,5 +1,8 @@
 pipeline {
     agent any
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+    }
 
     parameters {
         choice(name: 'TEST_MARKER', choices: ['smoke', 'regression'], description: '本次业务测试范围')

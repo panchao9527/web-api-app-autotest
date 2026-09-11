@@ -7,15 +7,16 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-
-import pytest
+from typing import TYPE_CHECKING
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from config.settings import CONFIG_FILE, Settings  # noqa: E402
-from core.safety import ensure_environment_allowed  # noqa: E402
+if TYPE_CHECKING:
+    from config.settings import Settings
+
+CONFIG_FILE = ROOT / "config" / "config.yaml"
 
 TEST_PATHS = {
     "api": "testcases/api",
@@ -105,7 +106,7 @@ def _check_virtual_environment() -> None:
         )
 
 
-def _check_imports() -> bool:
+def _check_imports(test_type: str | None = None) -> bool:
     required = {
         "pytest": "pytest",
         "pytest_timeout": "pytest-timeout",
@@ -113,7 +114,13 @@ def _check_imports() -> bool:
         "yaml": "PyYAML",
         "dotenv": "python-dotenv",
         "allure": "allure-pytest",
+        "loguru": "loguru",
+        "jsonschema": "jsonschema",
     }
+    if test_type in {"web", "all"}:
+        required.update({"playwright": "playwright", "pytest_playwright": "pytest-playwright"})
+    if test_type in {"app", "all"}:
+        required.update({"appium": "Appium-Python-Client", "selenium": "selenium"})
     missing = [
         package for module, package in required.items() if not importlib.util.find_spec(module)
     ]
@@ -127,9 +134,13 @@ def _check_imports() -> bool:
 
 
 def _check_config(environment: str) -> bool:
+    import yaml
+
     try:
+        from config.settings import Settings
+
         loaded = Settings(config_file=CONFIG_FILE, env=environment)
-    except ValueError as exc:
+    except (ValueError, OSError, yaml.YAMLError) as exc:
         _print_check("失败", str(exc))
         return False
     _print_check("通过", f"配置可读取，当前环境: {loaded.env}")
@@ -171,10 +182,10 @@ def _playwright_cache_roots() -> list[Path]:
     return roots
 
 
-def _check_optional_tools(loaded: Settings) -> None:
+def _check_optional_tools(loaded: "Settings") -> None:
     if importlib.util.find_spec("playwright"):
         if playwright_browser_installed(_playwright_cache_roots()):
-            _print_check("通过", "Playwright Chromium 已安装")
+            _print_check("提醒", "发现 Chromium 缓存；实际可启动性请用 doctor --type web 检查")
         else:
             _print_check("提醒", "未发现 Chromium 缓存。运行 playwright install chromium")
     else:
@@ -220,7 +231,26 @@ def _command_output(executable: str, *arguments: str) -> tuple[int, str]:
     return result.returncode, f"{result.stdout}\n{result.stderr}".strip()
 
 
-def _check_app_tools(loaded: Settings) -> bool:
+def _check_web_tools(loaded: "Settings") -> bool:
+    """在独立进程启动配置中的无头浏览器，仅开空白页，不访问业务网络。"""
+    browser = loaded.web["browser"]
+    script = (
+        "import sys\nfrom playwright.sync_api import sync_playwright\n"
+        "with sync_playwright() as p:\n"
+        "    browser = getattr(p, sys.argv[1]).launch(headless=True, timeout=15000)\n"
+        "    browser.close()\n"
+    )
+    code, _ = _command_output(sys.executable, "-c", script, browser)
+    _print_check(
+        "通过" if code == 0 else "失败",
+        f"Playwright {browser} 无头启动成功"
+        if code == 0
+        else f"Playwright {browser} 无法启动；请用当前 Python 执行 python -m playwright install {browser}，并检查系统依赖",
+    )
+    return code == 0
+
+
+def _check_app_tools(loaded: "Settings") -> bool:
     """执行 App 专项阻断检查；普通 API/Web doctor 不受设备状态影响。"""
     checks: list[bool] = []
     platform = str(loaded.app.get("platform", "Android")).lower()
@@ -322,12 +352,20 @@ def _check_app_tools(loaded: Settings) -> bool:
 def doctor(environment: str, test_type: str | None = None) -> int:
     print("自动化测试框架环境检查")
     print("=" * 40)
-    checks = [_check_python(), _check_imports(), _check_config(environment)]
+    checks = [_check_python(), _check_imports(test_type)]
     _check_virtual_environment()
+    if not all(checks):
+        return 1  # 缺依赖时不加载项目配置/插件，保证 doctor 自身还能给出修复提示。
+    checks.append(_check_config(environment))
     if checks[-1]:
         try:
+            from config.settings import Settings
+
             loaded = Settings(config_file=CONFIG_FILE, env=environment)
-            _check_optional_tools(loaded)
+            if test_type is None:
+                _check_optional_tools(loaded)
+            if test_type in {"web", "all"}:
+                checks.append(_check_web_tools(loaded))
             if test_type in {"app", "all"}:
                 checks.append(_check_app_tools(loaded))
         except ValueError as exc:
@@ -342,6 +380,10 @@ def run_app_smoke(environment: str, allow_prod: bool = False) -> int:
     if environment.lower() == "prod":
         _print_check("失败", "App 连接验收可能安装或重置应用，禁止在生产环境执行")
         return 2
+    import pytest
+
+    from core.safety import ensure_environment_allowed
+
     try:
         ensure_environment_allowed(environment, allow_prod)
     except pytest.UsageError as exc:
@@ -389,6 +431,34 @@ def clean_generated_files() -> int:
     return 0
 
 
+def serve_report(path: str | None = None) -> int:
+    """默认选择最近一个有真实 Allure 用例结果的运行目录，不清理任何历史报告。"""
+    if path:
+        selected = Path(path).expanduser().resolve()
+    else:
+        runs = ROOT / "reports" / "runs"
+        candidates = (
+            [item for item in runs.iterdir() if item.is_dir() and any(item.glob("*-result.json"))]
+            if runs.is_dir()
+            else []
+        )
+        if not candidates:
+            _print_check(
+                "失败", "尚无本地 Allure 用例结果，请先运行测试；自定义目录用 report --path 指定"
+            )
+            return 1
+        selected = max(candidates, key=lambda item: (item.stat().st_mtime_ns, item.name))
+    if not selected.is_dir() or not any(selected.glob("*-result.json")):
+        _print_check("失败", f"目录不存在或没有 Allure 用例结果: {selected}")
+        return 1
+    executable = shutil.which("allure.cmd") or shutil.which("allure")
+    if not executable:
+        _print_check("失败", "未找到 Allure 命令行，请按操作手册安装后重试")
+        return 1
+    _print_check("通过", f"打开 Allure 结果: {selected}")
+    return subprocess.run([executable, "serve", str(selected)], check=False, cwd=ROOT).returncode
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="API/Web/App 自动化测试统一命令")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -403,6 +473,8 @@ def create_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("self-test", help="运行完全离线的框架自测")
     subparsers.add_parser("clean", help="清理报告、日志和缓存")
+    report_parser = subparsers.add_parser("report", help="查看最近一次有用例结果的 Allure 报告")
+    report_parser.add_argument("--path", help="显式指定 Allure 原始结果目录")
 
     test_parser = subparsers.add_parser("test", help="运行真实业务测试")
     test_parser.add_argument("--type", choices=TEST_PATHS, default="all")
@@ -431,6 +503,12 @@ def main(argv: list[str] | None = None) -> int:
         return run_pytest(["-m", "pytest", "tests/framework"])
     if args.command == "clean":
         return clean_generated_files()
+    if args.command == "report":
+        return serve_report(args.path)
+
+    import pytest
+
+    from core.safety import ensure_environment_allowed
 
     try:
         ensure_environment_allowed(args.env, args.allow_prod)

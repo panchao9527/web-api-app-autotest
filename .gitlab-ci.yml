@@ -18,6 +18,7 @@ variables:
         TEST_MARKER: "smoke"
 
 framework-test:
+  timeout: 30m
   stage: quality
   image: python:3.12
   before_script:
@@ -35,6 +36,7 @@ framework-test:
       junit: reports/junit-framework.xml
 
 api-test:
+  timeout: 45m
   extends: .test-rules
   stage: test
   image: python:3.12
@@ -52,6 +54,7 @@ api-test:
       junit: reports/junit-api.xml
 
 web-test:
+  timeout: 45m
   extends: .test-rules
   stage: test
   image: mcr.microsoft.com/playwright/python:v1.49.1-jammy
@@ -69,6 +72,7 @@ web-test:
       junit: reports/junit-web.xml
 
 pages:
+  timeout: 15m
   stage: report
   image: eclipse-temurin:17-jre
   when: always
@@ -92,6 +96,7 @@ pages:
     paths: [public]
 
 notify:
+  timeout: 10m
   stage: notify
   image: python:3.12
   when: always

@@ -18,6 +18,7 @@ env:
 
 jobs:
   framework-test:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -61,6 +62,7 @@ jobs:
           if-no-files-found: ignore
 
   api-test:
+    timeout-minutes: 45
     # 接入真实 API 用例和账号后，在仓库 Variables 显式设为 true。
     if: github.event_name != 'pull_request' && vars.ENABLE_API_TESTS == 'true'
     needs: framework-test
@@ -92,6 +94,7 @@ jobs:
           if-no-files-found: ignore
 
   web-test:
+    timeout-minutes: 45
     if: github.event_name != 'pull_request' && vars.ENABLE_WEB_TESTS == 'true'
     needs: framework-test
     runs-on: ubuntu-latest
@@ -131,6 +134,7 @@ jobs:
           if-no-files-found: ignore
 
   report:
+    timeout-minutes: 15
     needs: [framework-test, api-test, web-test]
     if: always() && (needs.api-test.result != 'skipped' || needs.web-test.result != 'skipped')
     permissions:
@@ -160,6 +164,7 @@ jobs:
           retention-days: 7
 
   notify:
+    timeout-minutes: 10
     needs: [framework-test, api-test, web-test, report]
     if: always() && (needs.api-test.result != 'skipped' || needs.web-test.result != 'skipped')
     runs-on: ubuntu-latest
